@@ -1,0 +1,28 @@
+{
+    "ServerPort": 9000,
+    "ServerName": "ラムネサバイバー",
+    "ServerDescription": "このモードは、協力のモードです。",
+    "ServerStartMessage": "ようこそ！",
+    "ServerLoopInterval": 40,
+    
+    "BorderSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1000,
+        "h": 1000
+    },
+
+    "DebugMode": true,
+
+    "MaxConnectionsPerIP": 2,
+    "MaxPlayers": 100,
+    "MaxPlayerNameLength": 20,
+
+    "PlayerChatEnabled": true,
+    "PlayerChatLength": 100,
+    "PlayerChatCooldownEnabled": true,
+    "PlayerChatCooldown": 0.5,
+
+    "MaxSpawnEnemies": 500,
+    "MaxSpawnBullets": 500
+}

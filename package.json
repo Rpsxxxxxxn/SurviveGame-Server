@@ -1,0 +1,26 @@
+{
+  "name": "survivegame",
+  "version": "1.0.0",
+  "description": "SurviveGame-Server",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "run": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rpsxxxxxxn/SurviveGame-Server.git"
+  },
+  "keywords": [
+    "SurviveGame"
+  ],
+  "author": "Rpsxxxxxxn",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Rpsxxxxxxn/SurviveGame-Server/issues"
+  },
+  "homepage": "https://github.com/Rpsxxxxxxn/SurviveGame-Server#readme",
+  "dependencies": {
+    "ws": "^8.12.1"
+  }
+}

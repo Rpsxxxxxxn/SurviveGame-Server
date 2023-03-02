@@ -5,6 +5,7 @@ const Logger = require("./common/Logger");
 const QuadTree = require("./common/QuadTree");
 const Rectangle = require("./common/Rectangle");
 const AddChat = require("./packet/AddChat");
+const UpdateServerInfo = require("./packet/UpdateServerInfo");
 const Player = require("./Player");
 
 module.exports = class GameServer {
@@ -177,12 +178,18 @@ module.exports = class GameServer {
     onConnection(webSocket) {
         // プレイヤーの生成
         const player = new Player(this, webSocket, this.getGenerateId());
+
+        player.sendPacket(new UpdateServerInfo(
+            this.config.ServerName,
+            this.config.ServerDescription,
+            'ALPHA').getPacket());
+
         // プレイヤーの追加
         this.addPlayer(player);
         // 切断時の処理
         player.onDisconnect = () => {
             this.removePlayer(player);
-            this.removeQuadtreePosition(player);
+            this.removeQuadtreePosition(player.character);
             player.isAlive = false;
         };
         // プレイヤーの位置の追加

@@ -1,3 +1,5 @@
+const BinaryWriter = require("../common/BinaryWriter");
+
 module.exports = class UpdateServerInfo {
     constructor(serverName, serverDescription, serverVersion) {
         this.serverName = serverName;
@@ -11,6 +13,6 @@ module.exports = class UpdateServerInfo {
         this.writer.setString(this.serverName);
         this.writer.setString(this.serverDescription);
         this.writer.setString(this.serverVersion);
-        return this.writer.build();
+        return this.writer.toBuffer();
     }
 }

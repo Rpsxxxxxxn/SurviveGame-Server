@@ -22,6 +22,6 @@ module.exports = class UpdateLeaderboard {
             this.writer.setString(player.name);
             this.writer.setUint16(player.score);
         });
-        return this.writer.build();
+        return this.writer.toBuffer();
     }
 }

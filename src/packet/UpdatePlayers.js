@@ -22,6 +22,6 @@ module.exports = class UpdatePlayers {
             this.writer.setFloat32(player.position.x);
             this.writer.setFloat32(player.position.y);
         });
-        return this.writer.build();
+        return this.writer.toBuffer();
     }
 }

@@ -5,6 +5,7 @@ const Logger = require("./common/Logger");
 const QuadTree = require("./common/QuadTree");
 const Rectangle = require("./common/Rectangle");
 const AddChat = require("./packet/AddChat");
+const AddPlayer = require("./packet/AddPlayer");
 const UpdateServerInfo = require("./packet/UpdateServerInfo");
 const Player = require("./Player");
 
@@ -62,7 +63,11 @@ module.exports = class GameServer {
      * @param {*} player 
      */
     appendQuadtreePosition(player) {
-        this.quadtree.insert(player.position);
+        this.quadtree.insert(new Rectangle(
+            player.character.position.x - player.character.size,
+            player.character.position.y - player.character.size,
+            player.character.size * 2,
+            player.character.size * 2));
     }
 
     /**
@@ -70,8 +75,8 @@ module.exports = class GameServer {
      * @param {*} player 
      */
     updateQuadtreePosition(player) {
-        this.quadtree.remove(player.position);
-        this.quadtree.insert(player.position);
+        this.appendQuadtreePosition(player);
+        this.removeQuadtreePosition(player);
     }
 
     /**
@@ -79,16 +84,11 @@ module.exports = class GameServer {
      * @param {*} player 
      */
     removeQuadtreePosition(player) {
-        this.quadtree.remove(player.position);
-    }
-
-    /**
-     * プレイヤーの追加
-     */
-    onPhysicsUpdate() {
-        this.clients.forEach(player => {
-            player.onPhysicsUpdate();
-        });
+        this.quadtree.remove(new Rectangle(
+            player.character.position.x - player.character.size,
+            player.character.position.y - player.character.size,
+            player.character.size * 2,
+            player.character.size * 2));
     }
 
     /**
@@ -97,12 +97,6 @@ module.exports = class GameServer {
      * @param {*} rigidbody2 
      */
     onRigidbodyCollision(rigidbody1, rigidbody2) {
-        // if (rigidbody1 instanceof Bullet && rigidbody2 instanceof Player) {
-        //     if (rigidbody1.owner != rigidbody2) {
-        //         rigidbody2.onDamage(rigidbody1.damage);
-        //         rigidbody1.onDestroy();
-        //     }
-        // }
     }
 
     /**
@@ -130,7 +124,6 @@ module.exports = class GameServer {
      */
     addPlayer(player) {
         this.clients.push(player);
-        this.quadtree.insert(player.position);
     }
 
     /**
@@ -188,23 +181,18 @@ module.exports = class GameServer {
         // プレイヤーの生成
         const player = new Player(this, webSocket, this.getGenerateId());
 
-        player.sendPacket(new UpdateServerInfo(
+        player.onSendPacket(new AddPlayer(player).getPacket());
+        player.onSendPacket(new UpdateServerInfo(
             this.config.ServerName,
             this.config.ServerDescription,
             'ALPHA').getPacket());
 
         // プレイヤーの追加
         this.addPlayer(player);
-        // 切断時の処理
-        player.onDisconnect = () => {
-            this.removePlayer(player);
-            this.removeQuadtreePosition(player.character);
-            player.isAlive = false;
-        };
         // プレイヤーの位置の追加
         this.appendQuadtreePosition(player);
 
-        this.logger.log(`Player id: ${player.id} address: ${webSocket._socket.remoteAddress} port: ${webSocket._socket.remotePort}`);
+        this.logger.log(`Player id: ${player.character.id} address: ${webSocket._socket.remoteAddress} port: ${webSocket._socket.remotePort}`);
     }
 
     /**
@@ -212,6 +200,9 @@ module.exports = class GameServer {
      * @returns 
      */
     getGenerateId() {
+        if (this.generateId >= 999999999) {
+            this.generateId = 0;
+        }
         return this.generateId++;
     }
 

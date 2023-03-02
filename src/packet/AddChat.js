@@ -21,6 +21,6 @@ module.exports = class AddChat {
         this.writer.setUint32(this.player.id);
         this.writer.setString(this.player.name);
         this.writer.setString(this.message);
-        return this.writer.build();
+        return this.writer.toBuffer();
     }
 }

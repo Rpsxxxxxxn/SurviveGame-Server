@@ -64,27 +64,6 @@ module.exports = class QuadTree {
 
     /**
      * 四分木から点を検索する
-     */
-    subdivide() {
-        let x = this.boundary.x;
-        let y = this.boundary.y;
-        let w = this.boundary.w / 2;
-        let h = this.boundary.h / 2;
-
-        let ne = new Rectangle(x + w, y - h, w, h);
-        this.northeast = new QuadTree(ne, this.capacity);
-        let nw = new Rectangle(x - w, y - h, w, h);
-        this.northwest = new QuadTree(nw, this.capacity);
-        let se = new Rectangle(x + w, y + h, w, h);
-        this.southeast = new QuadTree(se, this.capacity);
-        let sw = new Rectangle(x - w, y + h, w, h);
-        this.southwest = new QuadTree(sw, this.capacity);
-
-        this.divided = true;
-    }
-
-    /**
-     * 四分木から点を検索する
      * @param {*} range 
      * @param {*} found 
      * @returns 
@@ -112,5 +91,32 @@ module.exports = class QuadTree {
         }
 
         return found;
+    }
+
+    /**
+     * 四分木から点を削除する
+     * @param {*} point 
+     * @returns 
+     */
+    remove(point) {
+        if (!this.boundary.contains(point)) {
+            return false;
+        }
+
+        for (let i = 0; i < this.points.length; i++) {
+            if (this.points[i].equals(point)) {
+                this.points.splice(i, 1);
+                return true;
+            }
+        }
+
+        if (this.divided) {
+            if (this.northeast.remove(point)) return true;
+            if (this.northwest.remove(point)) return true;
+            if (this.southeast.remove(point)) return true;
+            if (this.southwest.remove(point)) return true;
+        }
+
+        return false;
     }
 };

@@ -9,6 +9,6 @@ module.exports = class UpdateServerUsage {
         this.writer.setUint8(0x05);
         this.writer.setUint8(this.cpuUsage);
         this.writer.setUint8(this.ramUsage);
-        return this.writer.build();
+        return this.writer.toBuffer();
     }
 }

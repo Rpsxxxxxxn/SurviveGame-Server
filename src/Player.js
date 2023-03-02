@@ -13,9 +13,15 @@ module.exports = class Player {
         this.webSocket = webSocket;
         this.character = new Character(id);
 
-        this.onDisconnect = null;
         this.webSocket.on('message', this.onMessageHandler.bind(this));
         this.webSocket.on('close', this.onDisconnect.bind(this));
+    }
+
+    /**
+     * プレイヤー情報の更新
+     */
+    update() {
+        this.onPhysicsUpdate();
     }
 
     /**
@@ -91,13 +97,24 @@ module.exports = class Player {
      * @param {*} writer 
      */
     onSendPacket(writer) {
-        if (this.webSocket.type === 'open') {
-            this.webSocket.send(writer.toBuffer());
-        }
+        this.webSocket.send(writer);
     }
 
+    /**
+     * プレイヤーの攻撃
+     * @returns 
+     */
     onPhysicsUpdate() {
         if (!this.character.isAlive) return;
+    }
+
+    /**
+     * プレイヤーの削除
+     */
+    onDisconnect() {
+        this.character.isAlive = false;
+        this.gameServer.removePlayer(this);
+        this.gameServer.removeQuadtreePosition(this);
     }
 
 }

@@ -39,10 +39,14 @@ module.exports = class GameServer {
      * サーバーのループ処理
      */
     mainloop() {
-        this.objectUpdate();
-
-        this.calcDeltaTime();
-        this.calcFrameRate();
+        try {
+            this.objectUpdate();
+    
+            this.calcDeltaTime();
+            this.calcFrameRate();
+        } catch (err) {
+            this.logger.error(err);
+        }
         setTimeout(this.mainloop.bind(this), this.config.ServerLoopInterval);
     }
 
@@ -176,6 +180,11 @@ module.exports = class GameServer {
      * @param {*} webSocket 
      */
     onConnection(webSocket) {
+        // プレイヤー数のチェック
+        if (this.clients.length >= this.config.MaxPlayers) {
+            webSocket.close();
+            return;
+        }
         // プレイヤーの生成
         const player = new Player(this, webSocket, this.getGenerateId());
 
@@ -194,7 +203,8 @@ module.exports = class GameServer {
         };
         // プレイヤーの位置の追加
         this.appendQuadtreePosition(player);
-        this.logger.debug(`Player connected. (id: ${player.id})`);
+
+        this.logger.log(`Player id: ${player.id} address: ${webSocket._socket.remoteAddress} port: ${webSocket._socket.remotePort}`);
     }
 
     /**

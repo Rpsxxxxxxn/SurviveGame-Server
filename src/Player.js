@@ -1,4 +1,4 @@
-const Character = require("./Character");
+const Character = require("./entity/Character");
 const Vector2 = require("./common/Vector2");
 
 module.exports = class Player {
@@ -55,7 +55,7 @@ module.exports = class Player {
     onMove(reader) {
         if (!this.character.isAlive) return;
         this.character.position = new Vector2(reader.getFloat32(), reader.getFloat32());
-        this.character.rotation = reader.getFloat32();
+        this.character.direction = reader.getUint8();
     }
 
     /**
@@ -63,21 +63,22 @@ module.exports = class Player {
      * @param {*} reader 
      */
     onMessageHandler(reader) {
+        // パケットのタイプを取得する
         const type = reader.getUint8();
         switch (type) {
-            case 0:
+            case 0: // ゲームの開始
                 this.onGamePlay(reader);
                 break;
-            case 1:
+            case 1: // 観戦の開始
                 this.onSpectate(reader);
                 break;
-            case 2:
+            case 2: // プレイヤーの動作
                 this.onMove(reader);
                 break;
-            case 3:
+            case 3: // プレイヤーの攻撃
                 this.onShoot(reader);
                 break;
-            case 100:
+            case 100: // チャットの追加
                 this.onAddChat(reader);
                 break;
             default:

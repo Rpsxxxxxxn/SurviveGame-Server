@@ -1,4 +1,4 @@
-const Vector2 = require("./common/Vector2");
+const Vector2 = require("../common/Vector2");
 
 module.exports = class Character {
     constructor(id) {
@@ -21,7 +21,23 @@ module.exports = class Character {
         this.viewerBox = { minX: 0, minY: 0, maxX: 0, maxY: 0 }; // 視界範囲
     }
 
+    updateViewerBoxFilter(query) {
+        this.viewerBox.minX = this.position.x - query.range;
+        this.viewerBox.minY = this.position.y - query.range;
+        this.viewerBox.maxX = this.position.x + query.range;
+        this.viewerBox.maxY = this.position.y + query.range;
 
+        if (this.viewerBox.minX < 0) this.viewerBox.minX = 0;
+        if (this.viewerBox.minY < 0) this.viewerBox.minY = 0;
+        if (this.viewerBox.maxX > 100) this.viewerBox.maxX = 100;
+        if (this.viewerBox.maxY > 100) this.viewerBox.maxY = 100;
+
+        return this.viewerBox;
+    }
+
+    /**
+     * 視界範囲の更新
+     */
     updateViewerBox() {
         this.viewerBox.minX = this.position.x - 0.5;
         this.viewerBox.minY = this.position.y - 0.5;
@@ -29,6 +45,13 @@ module.exports = class Character {
         this.viewerBox.maxY = this.position.y + 0.5;
     }
 
+    /**
+     * 視界範囲の設定
+     * @param {*} minX 
+     * @param {*} minY 
+     * @param {*} maxX 
+     * @param {*} maxY 
+     */
     setViewerBox(minX, minY, maxX, maxY) {
         this.viewerBox.minX = minX;
         this.viewerBox.minY = minY;
@@ -36,10 +59,18 @@ module.exports = class Character {
         this.viewerBox.maxY = maxY;
     }
 
+    /**
+     * 視界範囲の取得
+     * @returns 
+     */
     getViewerBox() {
         return this.viewerBox;
     }
 
+    /**
+     * 視界範囲の中心座標の取得
+     * @returns 
+     */
     getViewerBoxCenter() {
         return new Vector2((this.viewerBox.minX + this.viewerBox.maxX) / 2, (this.viewerBox.minY + this.viewerBox.maxY) / 2);
     }

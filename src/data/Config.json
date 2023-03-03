@@ -4,6 +4,9 @@
     "ServerDescription": "このモードは、協力のモードです。",
     "ServerStartMessage": "ようこそ！",
     "ServerLoopInterval": 40,
+
+    "ServerEndTime": 1800000,
+    "ServerStageEnd": 300000,
     
     "BorderSize": {
         "x": 0,
@@ -14,6 +17,7 @@
 
     "DebugMode": true,
 
+    "MaxStage": 30,
     "MaxConnectionsPerIP": 2,
     "MaxPlayers": 100,
     "MaxPlayerNameLength": 20,
@@ -21,7 +25,7 @@
     "PlayerChatEnabled": true,
     "PlayerChatLength": 100,
     "PlayerChatCooldownEnabled": true,
-    "PlayerChatCooldown": 0.5,
+    "PlayerChatCooldown": 1000,
 
     "MaxSpawnEnemies": 500,
     "MaxSpawnBullets": 500

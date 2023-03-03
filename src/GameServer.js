@@ -8,16 +8,24 @@ const AddChat = require("./packet/AddChat");
 const AddPlayer = require("./packet/AddPlayer");
 const UpdateServerInfo = require("./packet/UpdateServerInfo");
 const Player = require("./Player");
+const Command = require("./Command");
+const StopWatch = require("./common/StopWatch");
 
 module.exports = class GameServer {
     constructor() {
         this.logger = new Logger();
         this.config = JSON.parse(this.readConfigText());
+        this.command = new Command(this);
+        this.stopWatch = new StopWatch();
         this.generateId = 0;
-        this.clients = [];
+        this.players = [];
         this.characters = [];
         this.bullets = [];
         this.deltaTime = 0;
+
+        this.gameLevel = 1; // レベル
+        this.gameExp = 0; // 経験値
+        this.gameStage = 1; // ステージ
 
         this.border = this.config.BorderSize;
         this.quadtree = new QuadTree(new Rectangle(this.border.x, this.border.y, this.border.w, this.border.h), 8);
@@ -34,6 +42,7 @@ module.exports = class GameServer {
         this.logger.log(`Border: ${JSON.stringify(this.border)}`);
         this.logger.log(`DebugMode: ${this.config.DebugMode}`);
         this.logger.log("Waiting for connections...");
+        this.stopWatch.start();
     }
 
     /**
@@ -45,6 +54,8 @@ module.exports = class GameServer {
     
             this.calcDeltaTime();
             this.calcFrameRate();
+            this.checkDeltaTime();
+            this.checkFrameRate();
         } catch (err) {
             this.logger.error(err);
         }
@@ -52,10 +63,18 @@ module.exports = class GameServer {
     }
 
     /**
+     * ゲームが終了したかどうかを判定する
+     * @returns 
+     */
+    checkGameEnd() {
+        return this.stopWatch.getElapsedTime() > this.config.ServerEndTime;
+    }
+
+    /**
      * 更新処理
      */
     objectUpdate() {
-        this.clients.forEach(player => player.update());
+        this.players.forEach(player => player.update());
     }
 
     /**
@@ -92,20 +111,13 @@ module.exports = class GameServer {
     }
 
     /**
-     * 当たり判定
-     * @param {*} rigidbody1 
-     * @param {*} rigidbody2 
-     */
-    onRigidbodyCollision(rigidbody1, rigidbody2) {
-    }
-
-    /**
      * パケットのブロードキャスト
      * @param {*} packet 
      */
     broadcastPacket(packet) {
-        this.clients.forEach(client => {
-            client.sendPacket(packet);
+        // パケットの送信
+        this.players.forEach(client => {
+            client.onSendPacket(packet);
         });
     }
 
@@ -115,7 +127,10 @@ module.exports = class GameServer {
      * @param {*} message 
      */
     addChat(player, message) {
-        this.broadcastPacket(new AddChat(player.name, message));
+        // チャットの送信
+        if (this.config.PlayerChatEnabled) {
+            this.broadcastPacket(new AddChat(player.name, message));
+        }
     }
 
     /**
@@ -123,7 +138,7 @@ module.exports = class GameServer {
      * @param {*} player 
      */
     addPlayer(player) {
-        this.clients.push(player);
+        this.players.push(player);
     }
 
     /**
@@ -131,7 +146,7 @@ module.exports = class GameServer {
      * @param {*} player 
      */
     removePlayer(player) {
-        this.clients.splice(this.clients.indexOf(player), 1);
+        this.players.splice(this.players.indexOf(player), 1);
     }
 
     /**
@@ -173,25 +188,20 @@ module.exports = class GameServer {
      * @param {*} webSocket 
      */
     onConnection(webSocket) {
-        // プレイヤー数のチェック
-        if (this.clients.length >= this.config.MaxPlayers) {
+        if (this.players.length >= this.config.MaxPlayers ||
+            this.players.find(client => client.webSocket._socket.remoteAddress === webSocket._socket.remoteAddress) ||
+            this.checkIPBanned(webSocket._socket.remoteAddress)) {
             webSocket.close();
             return;
         }
         // プレイヤーの生成
         const player = new Player(this, webSocket, this.getGenerateId());
-
-        player.onSendPacket(new AddPlayer(player).getPacket());
-        player.onSendPacket(new UpdateServerInfo(
-            this.config.ServerName,
-            this.config.ServerDescription,
-            'ALPHA').getPacket());
+        player.onSendPacket(new AddPlayer(player));
+        player.onSendPacket(new UpdateServerInfo(this.config.ServerName, this.config.ServerDescription, 'ALPHA'));
 
         // プレイヤーの追加
         this.addPlayer(player);
-        // プレイヤーの位置の追加
-        this.appendQuadtreePosition(player);
-
+        this.addCharacter(player.character);
         this.logger.log(`Player id: ${player.character.id} address: ${webSocket._socket.remoteAddress} port: ${webSocket._socket.remotePort}`);
     }
 
@@ -211,7 +221,7 @@ module.exports = class GameServer {
      * @returns 
      */
     readConfigText() {
-        return fs.readFileSync("./Config.json", "utf8");
+        return fs.readFileSync("./data/Config.json", "utf8");
     }
 
     /**
@@ -244,5 +254,54 @@ module.exports = class GameServer {
      */
     calcFrameRate() {
         this.frameRate = 1000 / this.deltaTime;
+    }
+
+    /**
+     * フレーム間隔のチェック
+     */
+    checkDeltaTime() {
+        if (this.deltaTime > 1000) {
+            throw new Error('DeltaTime is too large.');
+        }
+    }
+
+    /**
+     * フレームレートのチェック
+     */
+    checkFrameRate() {
+        if (this.frameRate < 5) {
+            throw new Error('FrameRate is too low.');
+        }
+    }
+
+    /**
+     * IPアドレスの禁止
+     * @param {*} ip 
+     */
+    addIPBanned(ip) {
+        this.ipBanList.push(ip);
+    }
+
+    /**
+     * 禁止IPアドレスの読込
+     */
+    loadIPBanList() {
+        this.ipBanList = fs.readFileSync("./data/IPBanList.txt", "utf8").split('¥r¥n');
+    }
+
+    /**
+     * 禁止IPアドレスの保存
+     */
+    saveIPBanList() {
+        fs.writeFileSync("./data/IPBanList.txt", this.ipBanList.join('¥r¥n'));
+    }
+
+    /**
+     * IPアドレスの禁止チェック
+     * @param {*} ip 
+     * @returns 
+     */
+    checkIPBanned(ip) {
+        return this.ipBanList.includes(ip);
     }
 }

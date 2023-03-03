@@ -3,10 +3,10 @@ const BinaryWriter = require("../common/BinaryWriter");
 module.exports = class AddPlayer {
     /**
      * プレイヤーを追加するパケットを生成する
-     * @param {*} player 
+     * @param {*} character 
      */
-    constructor(player) {
-        this.player = player;
+    constructor(character) {
+        this.character = character;
         this.writer = new BinaryWriter();
     }
 
@@ -16,13 +16,13 @@ module.exports = class AddPlayer {
      */
     getPacket() {
         this.writer.setUint8(0x00);
-        this.writer.setUint32(this.player.character.id);
-        this.writer.setString(this.player.character.name);
-        this.writer.setUint16(this.player.character.hp);
-        this.writer.setUint16(this.player.character.str);
-        this.writer.setUint16(this.player.character.dex);
-        this.writer.setUint16(this.player.character.int);
-        this.writer.setUint16(this.player.character.luk);
+        this.writer.setUint32(this.character.id);
+        this.writer.setUTF8String(this.character.name);
+        this.writer.setUint16(this.character.hp);
+        this.writer.setUint16(this.character.str);
+        this.writer.setUint16(this.character.dex);
+        this.writer.setUint16(this.character.int);
+        this.writer.setUint16(this.character.luk);
         return this.writer.toBuffer();
     }
 }

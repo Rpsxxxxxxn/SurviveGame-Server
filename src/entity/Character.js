@@ -7,11 +7,13 @@ module.exports = class Character {
         this.position = new Vector2(0, 0); // 座標
         this.direction = 0; // 0: up, 1: right, 2: down, 3: left
         this.isAlive = false; // 生存状態
-        
+        this.score = 0;
+        this.size = 30; // サイズ (半径)
+
         // ステータス
         this.hp = 100; // 体力
-        this.str = 1; // 物理攻撃力
-        this.vit = 1; // 防御力
+        this.str = 10; // 物理攻撃力
+        this.vit = 5; // 防御力
         this.dex = 1; // 攻撃速度
         this.int = 1; // 魔法攻撃力
         this.luk = 1; // クリティカル率
@@ -21,6 +23,62 @@ module.exports = class Character {
         this.viewerBox = { minX: 0, minY: 0, maxX: 0, maxY: 0 }; // 視界範囲
     }
 
+    /**
+     * 方向に移動する
+     * @param {*} direction 
+     */
+    directionMove(direction) {
+        this.position.x += Math.cos(direction) * 0.1;
+        this.position.y += Math.sin(direction) * 0.1;
+    }
+
+    /**
+     * 目標に向かって移動する
+     * @param {*} target 
+     * @returns 
+     */
+    targetTrackingMove(target) {
+        const distance = this.position.distance(target.position);
+        if (distance < 1) return;
+        this.directionMove(this.position.direction(target.position));
+    }
+
+    /**
+     * 弾の衝突判定
+     * @param {*} bullet 
+     * @returns 
+     */
+    checkBulletCollision(bullet) {
+        const distance = this.position.distance(bullet.position);
+        if (distance < 1) {
+            this.hp -= bullet.damage;
+            if (this.hp <= 0) {
+                this.isAlive = false;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 円形の衝突判定
+     * @param {*} target 
+     * @returns 
+     */
+    circleRigidbody(target) {
+        const distance = this.position.distance(target.position);
+        if (distance < 1) return;
+        const direction = this.position.direction(target.position);
+        const force = 1 / distance;
+        this.position.x += Math.cos(direction) * force;
+        this.position.y += Math.sin(direction) * force;
+    }
+
+    /**
+     * 視界範囲の更新
+     * @param {*} query 
+     * @returns 
+     */
     updateViewerBoxFilter(query) {
         this.viewerBox.minX = this.position.x - query.range;
         this.viewerBox.minY = this.position.y - query.range;

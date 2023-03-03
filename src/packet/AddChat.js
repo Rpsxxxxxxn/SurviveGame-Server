@@ -1,4 +1,5 @@
 const BinaryWriter = require("../common/BinaryWriter");
+const Utils = require("../common/Utils");
 
 module.exports = class AddChat {
     /**
@@ -18,9 +19,17 @@ module.exports = class AddChat {
      */
     getPacket() {
         this.writer.setUint8(0x02);
-        this.writer.setUint32(this.player.id);
-        this.writer.setString(this.player.name);
-        this.writer.setString(this.message);
+        // プレイヤーがいる場合はプレイヤーの情報を送信する
+        if (Utils.isNotNullOrEmpty(this.player)) {
+            this.writer.setUint32(this.player.character.id);
+            this.writer.setString(this.player.character.name);
+            this.writer.setString(this.message);
+        } else {
+            // プレイヤーがいない場合はサーバーからのメッセージとして送信する
+            this.writer.setUint32(0);
+            this.writer.setString("Server");
+            this.writer.setString(this.message);
+        }
         return this.writer.toBuffer();
     }
 }

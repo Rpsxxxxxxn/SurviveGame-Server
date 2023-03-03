@@ -1,5 +1,7 @@
 const Character = require("./entity/Character");
 const Vector2 = require("./common/Vector2");
+const StopWatch = require("./common/StopWatch");
+const AddChat = require("./packet/AddChat");
 
 module.exports = class Player {
     /**
@@ -12,6 +14,7 @@ module.exports = class Player {
         this.gameServer = gameServer;
         this.webSocket = webSocket;
         this.character = new Character(id);
+        this.chatStopWatch = new StopWatch();
 
         this.webSocket.on('message', this.onMessageHandler.bind(this));
         this.webSocket.on('close', this.onDisconnect.bind(this));
@@ -34,6 +37,7 @@ module.exports = class Player {
         this.character.name = reader.getString();
         this.character.isAlive = true;
         this.character.position = Vector2.random();
+        this.gameServer.addChat(null, "ゲームに入室しました。");
     }
 
     /**
@@ -43,6 +47,8 @@ module.exports = class Player {
      */
     onSpectate(reader) {
         if (this.character.isAlive) return;
+        const player = this.gameServer.clients.find(client => client.score);
+        player.onSendPacket(new AddChat(this, `${this.character.name ?? '名前無し'}が観戦しています。`));
     }
 
     /**
@@ -50,8 +56,21 @@ module.exports = class Player {
      * @param {*} reader 
      */
     onAddChat(reader) {
-        const chat = reader.getString();
-        this.gameServer.addChat(this, chat);
+        const message = reader.getString();
+        // チャットの内容をチェックする
+        if (this.gameServer.command.checkRemoteCommand(message)) {
+            this.gameServer.command.execute(message);
+        } else {
+            // チャットのクールタイムをチェックする
+            if (this.chatStopWatch.getElapsedTime() < this.gameServer.config.PlayerChatCooldown) {
+                this.onSendPacket(new AddChat(null, "チャットのクールタイム中です。連投は禁止です。"));
+                return;
+            }
+            // チャットの長さをチェックする
+            if (message.length > 0 && message.length < this.gameServer.config.PlayerChatLength) {
+                this.gameServer.addChat(this, message);
+            }
+        }
     }
 
     /**
@@ -97,7 +116,10 @@ module.exports = class Player {
      * @param {*} writer 
      */
     onSendPacket(writer) {
-        this.webSocket.send(writer);
+        // クライアントへの送信
+        if (webSocket._socket.readyState === WebSocket.OPEN && writer.toBuffer) {
+            this.webSocket.send(writer.toBuffer());
+        }
     }
 
     /**
@@ -116,5 +138,4 @@ module.exports = class Player {
         this.gameServer.removePlayer(this);
         this.gameServer.removeQuadtreePosition(this);
     }
-
 }

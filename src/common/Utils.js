@@ -101,7 +101,7 @@ module.exports = class Utils {
 
     /**
      * 現在の日付を取得する
-     * @returns 
+     * @returns YYYY-MM-DD
      */
     static getYYYYMMDD() {
         const date = new Date();
@@ -113,7 +113,7 @@ module.exports = class Utils {
 
     /**
      * 現在の日時を取得する
-     * @returns 
+     * @returns YYYY-MM-DD HH:MM:SS
      */
     static getYYYYMMDDHHMMSS() {
         const date = new Date();

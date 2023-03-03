@@ -4,9 +4,10 @@ const Utils = require("./Utils");
 module.exports = class Logger {
     constructor() {
         this._log = [];
-        this.directory = './log/';
-        this.filename = `${Utils.getYYYYMMDD()}.txt`;
-        this.createLogFile();
+        this.createLogFile('./log/log.txt');
+        this.createLogFile('./log/warn.txt');
+        this.createLogFile('./log/error.txt');
+        this.createLogFile('./log/debug.txt');
     }
 
     /**
@@ -15,7 +16,7 @@ module.exports = class Logger {
      */
     log(value) {
         const message = `[INFO] ${value}`;
-        this.appendFileLog(message)
+        this.appendFileLog('./log/log.txt', message);
         console.log(`\x1b[32m${message}`)
     }
 
@@ -25,7 +26,7 @@ module.exports = class Logger {
      */
     warn(value) {
         const message = `[WARN] ${value}`;
-        this.appendFileLog(message)
+        this.appendFileLog('./log/warn.txt', message);
         console.log(`\x1b[33m${message}`)
     }
 
@@ -35,7 +36,7 @@ module.exports = class Logger {
      */
     error(value) {
         const message = `[ERROR] ${value}`;
-        this.appendFileLog(message)
+        this.appendFileLog('./log/error.txt', message);
         console.log(`\x1b[31m${message}`)
     }
 
@@ -45,29 +46,21 @@ module.exports = class Logger {
      */
     debug(value) {
         const message = `[DEBUG] ${value}`;
-        this.appendFileLog(message)
+        this.appendFileLog('./log/debug.txt', message);
         console.log(`\x1b[37m${message}`)
-    }
-
-    /**
-     * ログをクリアする
-     */
-    clear() {
-        this._log = [];
     }
 
     /**
      * ログファイルを作成する
      */
-    createLogFile() {
-        const path = this.getFilePath();
+    createLogFile(path) {
         const flg = 'r';
         try {
             fs.readFileSync(path, 'utf-8', flg);
         } catch (err) {
             if (err) {
                 fs.writeFileSync(path, '');
-                this.appendFileLog(err);
+                this.error(err);
             }
         }
     }
@@ -76,15 +69,7 @@ module.exports = class Logger {
      * ログファイルにメッセージを追加する
      * @param {*} message 
      */
-    appendFileLog(message) {
-        fs.appendFileSync(this.getFilePath(), `[${Utils.getYYYYMMDDHHMMSS()}]${message}` + '\r\n');
-    }
-
-    /**
-     * ログファイルのパスを取得する
-     * @returns 
-     */
-    getFilePath() {
-        return this.directory + this.filename;
+    appendFileLog(path, message) {
+        fs.appendFileSync(path, `[${Utils.getYYYYMMDDHHMMSS()}]${message}` + '\r\n');
     }
 }

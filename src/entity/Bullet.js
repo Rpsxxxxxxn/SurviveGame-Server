@@ -13,6 +13,10 @@ module.exports = class Bullet {
         this.position = position;
         this.velocity = velocity;
         this.damage = damage;
+        this.size = 5;
+        this.isAlive = true;
+
+        this.quadTreeNode = null;
     }
 
     update() {
@@ -28,9 +32,21 @@ module.exports = class Bullet {
         this.gameServer.removeBullet(this);
     }
 
-
-    boomerang(direction) {
-        this.velocity = direction;
-        
+    setVelocity(velocity) {
+        this.velocity = velocity;
     }
+
+    setDamage(damage) {
+        this.damage = damage;
+    }
+
+    setSize(size) {
+        this.size = size;
+    }
+
+    setAlive(isAlive) {
+        this.isAlive = isAlive;
+    }
+
+    
 }

@@ -9,7 +9,7 @@ module.exports = class Character {
         this.direction = 0; // 0: up, 1: right, 2: down, 3: left
         this.isAlive = true; // 生存状態
         this.score = 0;
-        this.size = 30; // サイズ (半径)
+        this.size = 24; // サイズ (半径)
 
         // ステータス
         this.hp = 100; // 体力
@@ -22,6 +22,7 @@ module.exports = class Character {
 
         this.weapons = []; // 武器
         this.viewerBox = { minX: 0, minY: 0, maxX: 0, maxY: 0 }; // 視界範囲
+        this.quadTreeNode = null; // 4分木のノード
     }
 
     /**
@@ -29,8 +30,8 @@ module.exports = class Character {
      * @param {*} direction 
      */
     directionMove(direction) {
-        this.position.x -= Math.cos(direction) * 1;
-        this.position.y -= Math.sin(direction) * 1;
+        this.position.x += Math.cos(direction) * 1;
+        this.position.y += Math.sin(direction) * 1;
     }
 
     /**
@@ -42,6 +43,17 @@ module.exports = class Character {
         const distance = this.position.distance(target.position);
         if (distance < 1) return;
         this.directionMove(this.position.direction(target.position));
+    }
+
+    /**
+     * 移動制限
+     * @param {*} border 
+     */
+    positionMoveLimit(border) {
+        if (this.position.x < border.x) this.position.x = border.x;
+        if (this.position.y < border.y) this.position.y = border.y;
+        if (this.position.x > border.w - this.size * 2) this.position.x = border.w - this.size * 2;
+        if (this.position.y > border.h - this.size * 2) this.position.y = border.h - this.size * 2;
     }
 
     /**
@@ -132,5 +144,9 @@ module.exports = class Character {
      */
     getViewerBoxCenter() {
         return new Vector2((this.viewerBox.minX + this.viewerBox.maxX) / 2, (this.viewerBox.minY + this.viewerBox.maxY) / 2);
+    }
+
+    getSquaredSize() {
+        return this.size * this.size;
     }
 }

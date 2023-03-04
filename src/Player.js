@@ -4,6 +4,7 @@ const StopWatch = require("./common/StopWatch");
 const AddChat = require("./packet/AddChat");
 const { WebSocket } = require("ws");
 const BinaryReader = require("./common/BinaryReader");
+const Bullet = require("./entity/Bullet");
 
 module.exports = class Player {
     /**
@@ -19,15 +20,11 @@ module.exports = class Player {
         this.chatStopWatch = new StopWatch();
         this.chatStopWatch.start();
 
+        this.bulletCooldown = new StopWatch();
+        this.bulletCooldown.start();
+
         this.webSocket.on('message', this.onMessageHandler.bind(this));
         this.webSocket.on('close', this.onDisconnect.bind(this));
-    }
-
-    /**
-     * プレイヤー情報の更新
-     */
-    update() {
-        this.onPhysicsUpdate();
     }
 
     /**
@@ -129,15 +126,6 @@ module.exports = class Player {
     }
 
     /**
-     * プレイヤーの攻撃
-     * @returns 
-     */
-    onPhysicsUpdate() {
-        if (!this.character.isAlive) return;
-
-    }
-
-    /**
      * プレイヤーの削除
      */
     onDisconnect() {
@@ -145,5 +133,15 @@ module.exports = class Player {
         this.gameServer.removePlayer(this);
         this.gameServer.removeCharacter(this.character);
         this.gameServer.removeQuadtreePosition(this.character);
+    }
+
+    onShootBullet() {
+        if (this.bulletCooldown.getElapsedTime() < 1000) return;
+        const bullet = new Bullet(this, this.character.position, this.character.direction, 10, 19);
+        this.gameServer.addBullet(bullet);
+        // console.log(bullet)
+
+        this.bulletCooldown.reset();
+        this.bulletCooldown.start();
     }
 }

@@ -129,15 +129,32 @@ module.exports = class Vector2 {
     }
 
     distance(vector) {
-        let dx = this.x - vector.x;
-        let dy = this.y - vector.y;
+        let dx = vector.x - this.x;
+        let dy = vector.y - this.y;
         return Math.sqrt(dx * dx + dy * dy);
     }
 
     direction(vector) {
-        let dx = this.x - vector.x;
-        let dy = this.y - vector.y;
+        let dx = vector.x - this.x;
+        let dy = vector.y - this.y;
         return Math.atan2(dy, dx);
+    }
+
+    /**
+     * 逆方向の角度を求める
+     * @param {*} vector 
+     * @returns 
+     */
+    inverseDirection(vector) {
+        let dx = vector.x - this.x;
+        let dy = vector.y - this.y;
+        return Math.atan2(-dy, -dx);
+    }
+
+    static direction(vector1, vector2) {
+        let dx = vector2.x - vector1.x;
+        let dy = vector2.y - vector1.y;
+        return new Vector2(dx, dy);
     }
 
     /**

@@ -10,6 +10,10 @@ const UpdateServerInfo = require("./packet/UpdateServerInfo");
 const Player = require("./Player");
 const Command = require("./Command");
 const StopWatch = require("./common/StopWatch");
+const UpdatePlayers = require("./packet/UpdatePlayers");
+const TrackingId = require("./packet/TrackingId");
+const UpdateCharacters = require("./packet/UpdateCharacters");
+const UpdateServerUsage = require("./packet/UpdateServerUsage");
 
 module.exports = class GameServer {
     constructor() {
@@ -31,6 +35,7 @@ module.exports = class GameServer {
         this.quadtree = new QuadTree(new Rectangle(this.border.x, this.border.y, this.border.w, this.border.h), 8);
         this.webSocketServer = new WebSocket.Server({ port: this.config.ServerPort });
         this.webSocketServer.on('connection', this.onConnection.bind(this));
+        this.loadIPBanList();
     }
 
     /**
@@ -49,16 +54,25 @@ module.exports = class GameServer {
      * サーバーのループ処理
      */
     mainloop() {
-        try {
-            this.objectUpdate();
-    
-            this.calcDeltaTime();
-            this.calcFrameRate();
-            this.checkDeltaTime();
-            this.checkFrameRate();
-        } catch (err) {
-            this.logger.error(err);
+        if (this.checkGameEnd()) {
+            this.stopWatch.stop();
+            this.logger.log("Game end.");
         }
+
+        this.objectUpdate();
+
+        this.broadcastPacket(new UpdateCharacters(this.characters));
+        
+        this.calcDeltaTime();
+        this.calcFrameRate();
+        this.checkDeltaTime();
+        this.checkFrameRate();
+
+        this.broadcastPacket(new UpdateServerUsage(
+            this.getCpuUsage(),
+            this.getMemoryUsage(),
+            this.deltaTime,
+            this.frameRate));
         setTimeout(this.mainloop.bind(this), this.config.ServerLoopInterval);
     }
 
@@ -79,35 +93,35 @@ module.exports = class GameServer {
 
     /**
      * プレイヤー位置の追加
-     * @param {*} player 
+     * @param {*} character 
      */
-    appendQuadtreePosition(player) {
+    appendQuadtreePosition(character) {
         this.quadtree.insert(new Rectangle(
-            player.character.position.x - player.character.size,
-            player.character.position.y - player.character.size,
-            player.character.size * 2,
-            player.character.size * 2));
+            character.position.x - character.size,
+            character.position.y - character.size,
+            character.size * 2,
+            character.size * 2));
     }
 
     /**
      * プレイヤーの位置の更新
-     * @param {*} player 
+     * @param {*} character 
      */
-    updateQuadtreePosition(player) {
-        this.appendQuadtreePosition(player);
-        this.removeQuadtreePosition(player);
+    updateQuadtreePosition(character) {
+        this.appendQuadtreePosition(character);
+        this.removeQuadtreePosition(character);
     }
 
     /**
      * プレイヤー位置の削除
-     * @param {*} player 
+     * @param {*} character 
      */
-    removeQuadtreePosition(player) {
+    removeQuadtreePosition(character) {
         this.quadtree.remove(new Rectangle(
-            player.character.position.x - player.character.size,
-            player.character.position.y - player.character.size,
-            player.character.size * 2,
-            player.character.size * 2));
+            character.position.x - character.size,
+            character.position.y - character.size,
+            character.size * 2,
+            character.size * 2));
     }
 
     /**
@@ -123,13 +137,13 @@ module.exports = class GameServer {
 
     /**
      * チャットのブロードキャスト
-     * @param {*} player 
+     * @param {*} sender 
      * @param {*} message 
      */
-    addChat(player, message) {
+    addChat(sender, message) {
         // チャットの送信
         if (this.config.PlayerChatEnabled) {
-            this.broadcastPacket(new AddChat(player.name, message));
+            this.broadcastPacket(new AddChat(sender, message));
         }
     }
 
@@ -155,7 +169,7 @@ module.exports = class GameServer {
      */
     addCharacter(character) {
         this.characters.push(character);
-        this.quadtree.insert(character.position);
+        this.appendQuadtreePosition(character);
     }
 
     /**
@@ -164,6 +178,7 @@ module.exports = class GameServer {
      */
     removeCharacter(character) {
         this.characters.splice(this.characters.indexOf(character), 1);
+        this.removeQuadtreePosition(character);
     }
 
     /**
@@ -172,7 +187,7 @@ module.exports = class GameServer {
      */
     addBullet(bullet) {
         this.bullets.push(bullet);
-        this.quadtree.insert(bullet.position);
+        this.appendQuadtreePosition(character);
     }
 
     /**
@@ -181,6 +196,7 @@ module.exports = class GameServer {
      */
     removeBullet(bullet) {
         this.bullets.splice(this.bullets.indexOf(bullet), 1);
+        this.removeQuadtreePosition(character);
     }
 
     /**
@@ -189,19 +205,25 @@ module.exports = class GameServer {
      */
     onConnection(webSocket) {
         if (this.players.length >= this.config.MaxPlayers ||
-            this.players.find(client => client.webSocket._socket.remoteAddress === webSocket._socket.remoteAddress) ||
+            // this.players.find(client => client.webSocket._socket.remoteAddress === webSocket._socket.remoteAddress) ||
             this.checkIPBanned(webSocket._socket.remoteAddress)) {
             webSocket.close();
             return;
         }
         // プレイヤーの生成
         const player = new Player(this, webSocket, this.getGenerateId());
-        player.onSendPacket(new AddPlayer(player));
         player.onSendPacket(new UpdateServerInfo(this.config.ServerName, this.config.ServerDescription, 'ALPHA'));
 
         // プレイヤーの追加
         this.addPlayer(player);
         this.addCharacter(player.character);
+
+        player.onSendPacket(new UpdatePlayers(this.players));
+        player.onSendPacket(new TrackingId(player.character.id));
+        player.onSendPacket(new AddChat(null, `${this.config.ServerName}`));
+        player.onSendPacket(new AddChat(null, `${this.config.ServerDescription}`));
+        player.onSendPacket(new AddChat(null, `${this.config.ServerStartMessage}`));
+
         this.logger.log(`Player id: ${player.character.id} address: ${webSocket._socket.remoteAddress} port: ${webSocket._socket.remotePort}`);
     }
 
@@ -229,7 +251,7 @@ module.exports = class GameServer {
      * @returns 
      */
     getCpuUsage() {
-        return `${Math.round(os.loadavg()[0] * 100) / 100}%`;
+        return Math.round(os.loadavg()[0] * 100) / 100;
     }
 
     /**
@@ -238,7 +260,23 @@ module.exports = class GameServer {
      */
     getMemoryUsage() {
         const used = process.memoryUsage().heapUsed / 1024 / 1024;
-        return `${Math.round(used * 100) / 100}MB`;
+        return Math.round(used * 100) / 100;
+    }
+
+    /**
+     * CPU使用率の表示
+     * @returns 
+     */
+    getDisplayCpuUsage() {
+        return `CPU: ${this.getCpuUsage()}%`;
+    }
+
+    /**
+     * メモリ使用量の表示
+     * @returns 
+     */
+    getDisplayMemoryUsage() {
+        return `Memory: ${this.getMemoryUsage()}MB`;
     }
 
     /**

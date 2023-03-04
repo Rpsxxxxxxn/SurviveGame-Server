@@ -17,7 +17,7 @@ module.exports = class AddPlayer {
     getPacket() {
         this.writer.setUint8(0x00);
         this.writer.setUint32(this.character.id);
-        this.writer.setUTF8String(this.character.name);
+        this.writer.setString(this.character.name);
         this.writer.setUint16(this.character.hp);
         this.writer.setUint16(this.character.str);
         this.writer.setUint16(this.character.dex);

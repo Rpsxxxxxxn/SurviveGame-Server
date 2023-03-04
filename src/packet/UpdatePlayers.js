@@ -18,9 +18,9 @@ module.exports = class UpdatePlayers {
         this.writer.setUint8(0x01);
         this.writer.setUint8(this.players.length);
         this.players.forEach(player => {
-            this.writer.setUint8(player.id);
-            this.writer.setFloat32(player.position.x);
-            this.writer.setFloat32(player.position.y);
+            this.writer.setUint32(player.character.id);
+            this.writer.setFloat32(player.character.position.x);
+            this.writer.setFloat32(player.character.position.y);
         });
         return this.writer.toBuffer();
     }

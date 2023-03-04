@@ -15,6 +15,10 @@ module.exports = class Status {
         this.luk = luk;
     }
 
+    /**
+     * ステータスをバフする
+     * @param {*} status 
+     */
     buff(status) {
         this.hp += status.hp;
         this.atk += status.atk;
@@ -23,14 +27,26 @@ module.exports = class Status {
         this.luk += status.luk;
     }
 
+    /**
+     * ステータスをデバフする
+     * @param {*} status 
+     */
     debuff(status) {
-        this.hp -= status.hp;
+        this.hp -= status.hp;   
         this.atk -= status.atk;
         this.def -= status.def;
         this.spd -= status.spd;
         this.luk -= status.luk;
     }
 
+    /**
+     * ステータスを設定する
+     * @param {*} hp 
+     * @param {*} atk 
+     * @param {*} def 
+     * @param {*} spd 
+     * @param {*} luk 
+     */
     setValues(hp, atk, def, spd, luk) {
         this.hp = hp;
         this.atk = atk;

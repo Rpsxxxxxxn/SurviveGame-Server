@@ -92,7 +92,7 @@ module.exports = class BinaryReader {
         let length = this.getUint16();
         let value = '';
         for (let i = 0; i < length; i++) {
-            value += String.fromCharCode(this.getUint8());
+            value += String.fromCharCode(this.getUint16());
         }
         return value;
     }

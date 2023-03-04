@@ -1,10 +1,8 @@
-const BinaryReader = require("./common/BinaryReader");
 const BinaryWriter = require("./common/BinaryWriter");
 
 module.exports = class Command {
     constructor(gameServer) {
         this.gameServer = gameServer;
-        this.reader = new BinaryReader();
         this.writer = new BinaryWriter();
     }
 
@@ -17,8 +15,10 @@ module.exports = class Command {
         const args = command.split(' ');
         switch (args[0]) {
             case 'allbuff':
+                this.allBuff(player);
                 break;
             case 'godmode':
+                this.godMode(player);
                 break;
             default:
                 break;

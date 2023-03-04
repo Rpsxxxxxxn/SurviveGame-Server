@@ -36,4 +36,13 @@ module.exports = class Rectangle {
                  range.y - range.h > this.y + this.h ||
                  range.y + range.h < this.y - this.h);
     }
+
+    /**
+     * 四角形が他の四角形と等しいかどうかを判定する
+     * @param {*} rect 
+     * @returns 
+     */
+    equals(rect) {
+        return this.x === rect.x && this.y === rect.y && this.w === rect.w && this.h === rect.h;
+    }
 }

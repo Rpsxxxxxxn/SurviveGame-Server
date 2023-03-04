@@ -2,6 +2,8 @@ const Character = require("./entity/Character");
 const Vector2 = require("./common/Vector2");
 const StopWatch = require("./common/StopWatch");
 const AddChat = require("./packet/AddChat");
+const { WebSocket } = require("ws");
+const BinaryReader = require("./common/BinaryReader");
 
 module.exports = class Player {
     /**
@@ -15,6 +17,7 @@ module.exports = class Player {
         this.webSocket = webSocket;
         this.character = new Character(id);
         this.chatStopWatch = new StopWatch();
+        this.chatStopWatch.start();
 
         this.webSocket.on('message', this.onMessageHandler.bind(this));
         this.webSocket.on('close', this.onDisconnect.bind(this));
@@ -60,6 +63,7 @@ module.exports = class Player {
         // チャットの内容をチェックする
         if (this.gameServer.command.checkRemoteCommand(message)) {
             this.gameServer.command.execute(message);
+            this.gameServer.logger.log(`[Command] ${this.character.name ?? '名前無し'}: ${message}`);
         } else {
             // チャットのクールタイムをチェックする
             if (this.chatStopWatch.getElapsedTime() < this.gameServer.config.PlayerChatCooldown) {
@@ -69,6 +73,9 @@ module.exports = class Player {
             // チャットの長さをチェックする
             if (message.length > 0 && message.length < this.gameServer.config.PlayerChatLength) {
                 this.gameServer.addChat(this, message);
+                this.chatStopWatch.reset();
+                this.chatStopWatch.start();
+                this.gameServer.logger.log(`[${this.webSocket._socket.remoteAddress}][Chat] ${this.character.name ?? '名前無し'}: ${message}`);
             }
         }
     }
@@ -79,15 +86,17 @@ module.exports = class Player {
      */
     onMove(reader) {
         if (!this.character.isAlive) return;
-        this.character.position = new Vector2(reader.getFloat32(), reader.getFloat32());
-        this.character.direction = reader.getUint8();
+        const direction = reader.getUint8();
+        this.character.direction = direction * (Math.PI / 4);
+        this.character.position.add(Vector2.fromAngle(this.character.direction).mulScalar(2));
     }
 
     /**
      * クライアントからのメッセージを処理する
      * @param {*} reader 
      */
-    onMessageHandler(reader) {
+    onMessageHandler(event) {
+        const reader = new BinaryReader(event);
         // パケットのタイプを取得する
         const type = reader.getUint8();
         switch (type) {
@@ -99,9 +108,6 @@ module.exports = class Player {
                 break;
             case 2: // プレイヤーの動作
                 this.onMove(reader);
-                break;
-            case 3: // プレイヤーの攻撃
-                this.onShoot(reader);
                 break;
             case 100: // チャットの追加
                 this.onAddChat(reader);
@@ -117,8 +123,8 @@ module.exports = class Player {
      */
     onSendPacket(writer) {
         // クライアントへの送信
-        if (webSocket._socket.readyState === WebSocket.OPEN && writer.toBuffer) {
-            this.webSocket.send(writer.toBuffer());
+        if (this.webSocket._socket.readyState === 'open') {
+            this.webSocket.send(writer.getPacket());
         }
     }
 
@@ -128,6 +134,7 @@ module.exports = class Player {
      */
     onPhysicsUpdate() {
         if (!this.character.isAlive) return;
+
     }
 
     /**
@@ -136,6 +143,7 @@ module.exports = class Player {
     onDisconnect() {
         this.character.isAlive = false;
         this.gameServer.removePlayer(this);
-        this.gameServer.removeQuadtreePosition(this);
+        this.gameServer.removeCharacter(this.character);
+        this.gameServer.removeQuadtreePosition(this.character);
     }
 }

@@ -11,6 +11,13 @@ module.exports = class Vector2 {
     add(vector) {
         this.x += vector.x;
         this.y += vector.y;
+        return this;
+    }
+
+    addScalar(scalar) {
+        this.x += scalar;
+        this.y += scalar;
+        return this;
     }
 
     /**
@@ -20,6 +27,13 @@ module.exports = class Vector2 {
     sub(vector) {
         this.x -= vector.x;
         this.y -= vector.y;
+        return this;
+    }
+
+    subScalar(scalar) {
+        this.x -= scalar;
+        this.y -= scalar;
+        return this;
     }
 
     /**
@@ -29,6 +43,13 @@ module.exports = class Vector2 {
     mul(vector) {
         this.x *= vector.x;
         this.y *= vector.y;
+        return this;
+    }
+
+    mulScalar(scalar) {
+        this.x *= scalar;
+        this.y *= scalar;
+        return this;
     }
 
     /**
@@ -38,6 +59,13 @@ module.exports = class Vector2 {
     div(vector) {
         this.x /= vector.x;
         this.y /= vector.y;
+        return this;
+    }
+
+    divScalar(scalar) {
+        this.x /= scalar;
+        this.y /= scalar;
+        return this;
     }
 
     /**
@@ -55,6 +83,7 @@ module.exports = class Vector2 {
         let mag = this.mag();
         this.x /= mag;
         this.y /= mag;
+        return this;
     }
 
     /**
@@ -66,6 +95,7 @@ module.exports = class Vector2 {
             this.normalize();
             this.mul(max);
         }
+        return this;
     }
 
     /**
@@ -75,6 +105,7 @@ module.exports = class Vector2 {
     setMag(mag) {
         this.normalize();
         this.mul(mag);
+        return this;
     }
 
     /**
@@ -94,6 +125,7 @@ module.exports = class Vector2 {
         let mag = this.mag();
         this.x = Math.cos(newHeading) * mag;
         this.y = Math.sin(newHeading) * mag;
+        return this;
     }
 
     /**

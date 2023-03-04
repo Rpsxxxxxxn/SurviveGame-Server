@@ -8,7 +8,7 @@ module.exports = class AddChat {
      * @param {*} message 
      */
     constructor(sender, message) {
-        this.player = sender;
+        this.sender = sender;
         this.message = message;
         this.writer = new BinaryWriter();
     }
@@ -20,9 +20,9 @@ module.exports = class AddChat {
     getPacket() {
         this.writer.setUint8(0x02);
         // プレイヤーがいる場合はプレイヤーの情報を送信する
-        if (Utils.isNotNullOrEmpty(this.player)) {
-            this.writer.setUint32(this.player.character.id);
-            this.writer.setString(this.player.character.name);
+        if (Utils.isNotEmpty(this.sender)) {
+            this.writer.setUint32(this.sender.character.id);
+            this.writer.setString(this.sender.character.name);
             this.writer.setString(this.message);
         } else {
             // プレイヤーがいない場合はサーバーからのメッセージとして送信する

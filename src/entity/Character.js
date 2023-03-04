@@ -3,10 +3,10 @@ const Vector2 = require("../common/Vector2");
 module.exports = class Character {
     constructor(id) {
         this.id = id; // ID
-        this.name = ""; // 名前
+        this.name = "テスト名"; // 名前
         this.position = new Vector2(0, 0); // 座標
         this.direction = 0; // 0: up, 1: right, 2: down, 3: left
-        this.isAlive = false; // 生存状態
+        this.isAlive = true; // 生存状態
         this.score = 0;
         this.size = 30; // サイズ (半径)
 

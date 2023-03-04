@@ -7,15 +7,13 @@ module.exports = class UpdateBullets {
     }
 
     getPacket() {
-        this.writer.setUint8(0x07);
+        this.writer.setUint8(0x0A);
         this.writer.setUint32(this.bullets.length);
         this.bullets.forEach(bullet => {
+            this.writer.setUint32(bullet.id);
             this.writer.setFloat32(bullet.x);
             this.writer.setFloat32(bullet.y);
-            this.writer.setFloat32(bullet.r);
-            this.writer.setFloat32(bullet.angle);
-            this.writer.setFloat32(bullet.speed);
-            this.writer.setUint8(bullet.owner);
+            this.writer.setFloat32(bullet.size);
         });
         return this.writer.toBuffer();
     }

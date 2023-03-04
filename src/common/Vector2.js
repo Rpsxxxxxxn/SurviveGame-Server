@@ -140,6 +140,10 @@ module.exports = class Vector2 {
         return Math.atan2(dy, dx);
     }
 
+    copy() {
+        return new Vector2(this.x, this.y);
+    }
+
     /**
      * 逆方向の角度を求める
      * @param {*} vector 

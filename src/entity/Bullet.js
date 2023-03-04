@@ -1,3 +1,5 @@
+const Vector2 = require("../common/Vector2");
+
 module.exports = class Bullet {
     /**
      * 弾のクラス
@@ -20,7 +22,8 @@ module.exports = class Bullet {
     }
 
     update() {
-        this.position.add(this.velocity);
+        // console.log(this.position)
+        this.position.add(Vector2.fromAngle(this.velocity).mulScalar(10));
     }
 
     physicsUpdate() {
@@ -46,6 +49,10 @@ module.exports = class Bullet {
 
     setAlive(isAlive) {
         this.isAlive = isAlive;
+    }
+
+    getSquaredSize() {
+        return this.size * this.size;
     }
 
     

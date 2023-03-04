@@ -137,7 +137,13 @@ module.exports = class Player {
 
     onShootBullet() {
         if (this.bulletCooldown.getElapsedTime() < 1000) return;
-        const bullet = new Bullet(this, this.character.position, this.character.direction, 10, 19);
+        const bullet = new Bullet(
+            this,
+            this.gameServer.getGenerateId(),
+            this.character.position.copy(),
+            this.character.direction,
+            10,
+            20);
         this.gameServer.addBullet(bullet);
         // console.log(bullet)
 

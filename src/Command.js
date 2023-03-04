@@ -11,7 +11,7 @@ module.exports = class Command {
      * @param {*} command 
      */
     execute(player, message) {
-        const command = message.slice(1);
+        const command = String(message).slice(1);
         const args = command.split(' ');
         switch (args[0]) {
             case 'allbuff':

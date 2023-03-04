@@ -125,4 +125,20 @@ module.exports = class Utils {
         const second = String(date.getSeconds()).padStart(2, '0');
         return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
     }
+
+    static getHexToRgb(hex) {
+        const rgb = [];
+        for (let i = 0; i < 3; i++) {
+            rgb.push(parseInt(hex.substr(i * 2, 2), 16));
+        }
+        return rgb;
+    }
+
+    static getRgbToHex(rgb) {
+        let hex = '#';
+        for (let i = 0; i < 3; i++) {
+            hex += ('0' + rgb[i].toString(16)).slice(-2);
+        }
+        return hex;
+    }
 }

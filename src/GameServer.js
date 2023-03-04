@@ -20,6 +20,7 @@ const Character = require("./entity/Character");
 const Utils = require("./common/Utils");
 const ObjectNode = require("./common/ObjectNode");
 const Vector2 = require("./common/Vector2");
+const UpdateBullets = require("./packet/UpdateBullets");
 
 module.exports = class GameServer {
     constructor() {
@@ -81,6 +82,7 @@ module.exports = class GameServer {
         this.objectUpdate();
 
         this.broadcastPacket(new UpdateCharacters(this.characters));
+        this.broadcastPacket(new UpdateBullets(this.bullets));
         
         this.calcDeltaTime();
         this.calcFrameRate();
@@ -113,12 +115,6 @@ module.exports = class GameServer {
     objectUpdate() {
         // プレイヤーの更新
         this.players.forEach(player => {
-            // player.update()
-            // const viewboxObjects = this.quadtree.query(new Rectangle(
-            //     player.character.viewerBox.x,
-            //     player.character.viewerBox.y,
-            //     player.character.viewerBox.w,
-            //     player.character.viewerBox.h));
             player.onShootBullet();
         });
         const targetCharacters = this.characters.filter(character => character.isAlive && Utils.isNotEmpty(character.parent));
@@ -135,10 +131,11 @@ module.exports = class GameServer {
             this.updateQuadtreePosition(character);
         });
         this.bullets.forEach((bullet) => {
-            this.queryQuadtree(bullet).forEach((target) => {
-                this.onBulletCollision(bullet, target.object);
-            });
+            // this.queryQuadtree(bullet).forEach((target) => {
+            //     this.onBulletCollision(bullet, target.object);
+            // });
             this.updateQuadtreePosition(bullet);
+            bullet.physicsUpdate();
         });
     }
 

@@ -14,6 +14,9 @@ const UpdatePlayers = require("./packet/UpdatePlayers");
 const TrackingId = require("./packet/TrackingId");
 const UpdateCharacters = require("./packet/UpdateCharacters");
 const UpdateServerUsage = require("./packet/UpdateServerUsage");
+const AddBorder = require("./packet/AddBorder");
+const Character = require("./entity/Character");
+const Utils = require("./common/Utils");
 
 module.exports = class GameServer {
     constructor() {
@@ -21,6 +24,7 @@ module.exports = class GameServer {
         this.config = JSON.parse(this.readConfigText());
         this.command = new Command(this);
         this.stopWatch = new StopWatch();
+        this.movePacketWatch = new StopWatch();
         this.generateId = 0;
         this.players = [];
         this.characters = [];
@@ -36,6 +40,18 @@ module.exports = class GameServer {
         this.webSocketServer = new WebSocket.Server({ port: this.config.ServerPort });
         this.webSocketServer.on('connection', this.onConnection.bind(this));
         this.loadIPBanList();
+
+        for (let i = 0; i < 30; i++) {
+            this.addEnemyCharacter();
+        }
+    }
+
+    addExp(exp) {
+        this.gameExp += exp;
+        if (this.gameExp >= this.gameLevel * 100) {
+            this.gameLevel++;
+            this.gameExp = 0;
+        }
     }
 
     /**
@@ -54,10 +70,10 @@ module.exports = class GameServer {
      * サーバーのループ処理
      */
     mainloop() {
-        if (this.checkGameEnd()) {
-            this.stopWatch.stop();
-            this.logger.log("Game end.");
-        }
+        // if (this.checkGameEnd()) {
+        //     this.stopWatch.stop();
+        //     this.logger.log("Game end.");
+        // }
 
         this.objectUpdate();
 
@@ -68,12 +84,18 @@ module.exports = class GameServer {
         this.checkDeltaTime();
         this.checkFrameRate();
 
-        this.broadcastPacket(new UpdateServerUsage(
-            this.getCpuUsage(),
-            this.getMemoryUsage(),
-            this.deltaTime,
-            this.frameRate));
+        if (~~(this.getElapsedTimeSecond()) % 10 === 0) {
+            this.broadcastPacket(new UpdateServerUsage(
+                this.getCpuUsage(),
+                this.getMemoryUsage(),
+                this.deltaTime,
+                this.frameRate));
+        }
         setTimeout(this.mainloop.bind(this), this.config.ServerLoopInterval);
+    }
+
+    getElapsedTimeSecond() {
+        return this.stopWatch.getElapsedTime() / 1000;
     }
 
     /**
@@ -88,7 +110,23 @@ module.exports = class GameServer {
      * 更新処理
      */
     objectUpdate() {
-        this.players.forEach(player => player.update());
+        // プレイヤーの更新
+        this.players.forEach(player => {
+            player.update()
+        });
+        let targetCharacters = this.characters.filter(character => character.isAlive && Utils.isNotEmpty(character.parent));
+        // キャラクターの更新
+        this.characters.forEach((character) => {
+            // character.update()
+
+            if (targetCharacters) {
+                targetCharacters.forEach(target => {
+                    if (character !== target) {
+                        character.targetTrackingMove(target);
+                    }
+                });
+            }
+        });
     }
 
     /**
@@ -213,13 +251,14 @@ module.exports = class GameServer {
         // プレイヤーの生成
         const player = new Player(this, webSocket, this.getGenerateId());
         player.onSendPacket(new UpdateServerInfo(this.config.ServerName, this.config.ServerDescription, 'ALPHA'));
+        player.onSendPacket(new AddBorder(this.border));
 
         // プレイヤーの追加
         this.addPlayer(player);
         this.addCharacter(player.character);
 
         player.onSendPacket(new UpdatePlayers(this.players));
-        player.onSendPacket(new TrackingId(player.character.id));
+        player.onSendPacket(new TrackingId(player.character.id));   
         player.onSendPacket(new AddChat(null, `${this.config.ServerName}`));
         player.onSendPacket(new AddChat(null, `${this.config.ServerDescription}`));
         player.onSendPacket(new AddChat(null, `${this.config.ServerStartMessage}`));
@@ -341,5 +380,16 @@ module.exports = class GameServer {
      */
     checkIPBanned(ip) {
         return this.ipBanList.includes(ip);
+    }
+
+    /**
+     * プレイヤーの追加
+     */
+    addEnemyCharacter() {
+        const enemy = new Character(null, this.getGenerateId());
+        enemy.position.x = Math.random() * this.border.w;
+        enemy.position.y = Math.random() * this.border.h;
+        this.addCharacter(enemy);
+        // this.logger.debug(`Enemy id: ${enemy.id} position: ${enemy.position.x}, ${enemy.position.y}`);
     }
 }

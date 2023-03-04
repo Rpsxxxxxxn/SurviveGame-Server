@@ -128,6 +128,18 @@ module.exports = class Vector2 {
         return this;
     }
 
+    distance(vector) {
+        let dx = this.x - vector.x;
+        let dy = this.y - vector.y;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    direction(vector) {
+        let dx = this.x - vector.x;
+        let dy = this.y - vector.y;
+        return Math.atan2(dy, dx);
+    }
+
     /**
      * 足し算
      * @param {*} vector1 

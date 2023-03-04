@@ -1,7 +1,8 @@
 const Vector2 = require("../common/Vector2");
 
 module.exports = class Character {
-    constructor(id) {
+    constructor(parent, id) {
+        this.parent = parent; // 親クラス
         this.id = id; // ID
         this.name = "テスト名"; // 名前
         this.position = new Vector2(0, 0); // 座標
@@ -28,8 +29,8 @@ module.exports = class Character {
      * @param {*} direction 
      */
     directionMove(direction) {
-        this.position.x += Math.cos(direction) * 0.1;
-        this.position.y += Math.sin(direction) * 0.1;
+        this.position.x -= Math.cos(direction) * 1;
+        this.position.y -= Math.sin(direction) * 1;
     }
 
     /**

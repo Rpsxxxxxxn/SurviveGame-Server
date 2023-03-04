@@ -15,7 +15,7 @@ module.exports = class Player {
     constructor(gameServer, webSocket, id) {
         this.gameServer = gameServer;
         this.webSocket = webSocket;
-        this.character = new Character(id);
+        this.character = new Character(this, id);
         this.chatStopWatch = new StopWatch();
         this.chatStopWatch.start();
 
@@ -75,7 +75,7 @@ module.exports = class Player {
                 this.gameServer.addChat(this, message);
                 this.chatStopWatch.reset();
                 this.chatStopWatch.start();
-                this.gameServer.logger.log(`[${this.webSocket._socket.remoteAddress}][Chat] ${this.character.name ?? '名前無し'}: ${message}`);
+                this.gameServer.logger.chat(this.webSocket._socket.remoteAddress, `${this.character.name ?? '名前無し'}: ${message}`);
             }
         }
     }
@@ -88,7 +88,7 @@ module.exports = class Player {
         if (!this.character.isAlive) return;
         const direction = reader.getUint8();
         this.character.direction = direction * (Math.PI / 4);
-        this.character.position.add(Vector2.fromAngle(this.character.direction).mulScalar(2));
+        this.character.position.add(Vector2.fromAngle(this.character.direction).mulScalar(4));
     }
 
     /**

@@ -7,3 +7,10 @@ $ npm install
 $ cd src
 $ node index.js
 ```
+
+# このゲームのについて
+生き残ればOK  
+ルーム制  
+ローグライク  
+
+# TODO

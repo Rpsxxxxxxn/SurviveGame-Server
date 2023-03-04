@@ -6,6 +6,5 @@ try {
     server.mainloop();
 } catch (err) {
     server.logger.error(err);
-} finally {
-    server.logger.log('Server closed.');
+    server.logger.log('Server stopped.');
 }

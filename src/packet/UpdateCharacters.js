@@ -8,11 +8,12 @@ module.exports = class UpdateCharacters {
 
     getPacket() {
         this.writer.setUint8(0x07);
-        this.writer.setUint8(this.characters.length);
+        this.writer.setUint16(this.characters.length);
         this.characters.forEach(character => {
             this.writer.setUint32(character.id);
             this.writer.setFloat32(character.position.x);
             this.writer.setFloat32(character.position.y);
+            this.writer.setFloat32(character.direction);
         });
         return this.writer.toBuffer();
     }

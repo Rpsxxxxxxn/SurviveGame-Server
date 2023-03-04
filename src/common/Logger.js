@@ -8,6 +8,7 @@ module.exports = class Logger {
         this.createLogFile('./log/warn.txt');
         this.createLogFile('./log/error.txt');
         this.createLogFile('./log/debug.txt');
+        this.createLogFile('./log/chatlog.txt');
     }
 
     /**
@@ -47,6 +48,16 @@ module.exports = class Logger {
     debug(value) {
         const message = `[DEBUG] ${value}`;
         this.appendFileLog('./log/debug.txt', message);
+        console.log(`\x1b[37m${message}`)
+    }
+
+    /**
+     * チャットログを出力する
+     * @param {*} value 
+     */
+    chat(address, value) {
+        const message = `[CHAT][${address}] ${value}`;
+        this.appendFileLog('./log/chatlog.txt', message);
         console.log(`\x1b[37m${message}`)
     }
 

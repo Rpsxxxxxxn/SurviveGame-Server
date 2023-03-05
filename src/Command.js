@@ -1,4 +1,5 @@
 const BinaryWriter = require("./common/BinaryWriter");
+const AddChat = require("./packet/AddChat");
 
 module.exports = class Command {
     constructor(gameServer) {
@@ -21,6 +22,7 @@ module.exports = class Command {
                 this.godMode(player);
                 break;
             default:
+                player.onSendPacket(new AddChat(null, `コマンドが見つかりません。`));
                 break;
         }
     }
@@ -36,6 +38,7 @@ module.exports = class Command {
         player.character.luk = 9999;
         player.character.spd = 9999;
         player.character.vit = 9999;
+        player.onSendPacket(new AddChat(null, `コマンドが見つかりません。`));
     }
 
     /**
@@ -50,6 +53,7 @@ module.exports = class Command {
         player.character.luk = 9999;
         player.character.spd = 9999;
         player.character.vit = 9999;
+        player.onSendPacket(new AddChat(null, `コマンドが見つかりません。`));
     }
 
     /**

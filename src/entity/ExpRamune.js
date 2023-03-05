@@ -7,11 +7,20 @@ module.exports = class ExpRamune {
         this.isAlive = true;
     }
 
+    /**
+     * 移動する
+     * @param {*} direction 
+     */
     directionMove(direction) {
         this.position.x += Math.cos(direction) * 1;
         this.position.y += Math.sin(direction) * 1;
     }
 
+    /**
+     * 目標に向かって移動する
+     * @param {*} target 
+     * @returns 
+     */
     trackingMove(target) {
         const distance = this.position.distance(target.position);
         if (distance < 1) return;

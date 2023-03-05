@@ -128,18 +128,32 @@ module.exports = class Vector2 {
         return this;
     }
 
+    /**
+     * 距離を求める
+     * @param {*} vector 
+     * @returns 
+     */
     distance(vector) {
         let dx = vector.x - this.x;
         let dy = vector.y - this.y;
         return Math.sqrt(dx * dx + dy * dy);
     }
 
+    /**
+     * ベクトルの角度を設定する
+     * @param {*} vector 
+     * @returns 
+     */
     direction(vector) {
         let dx = vector.x - this.x;
         let dy = vector.y - this.y;
         return Math.atan2(dy, dx);
     }
 
+    /**
+     * ベクトルのコピー
+     * @returns 
+     */
     copy() {
         return new Vector2(this.x, this.y);
     }
@@ -155,6 +169,12 @@ module.exports = class Vector2 {
         return Math.atan2(-dy, -dx);
     }
 
+    /**
+     * ベクトルの角度を設定する
+     * @param {*} vector1 
+     * @param {*} vector2 
+     * @returns 
+     */
     static direction(vector1, vector2) {
         let dx = vector2.x - vector1.x;
         let dy = vector2.y - vector1.y;

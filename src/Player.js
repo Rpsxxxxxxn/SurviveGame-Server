@@ -16,15 +16,39 @@ module.exports = class Player {
     constructor(gameServer, webSocket, id) {
         this.gameServer = gameServer;
         this.webSocket = webSocket;
-        this.character = new Character(this, id);
+        this.character = new Character(this, 0, id);
         this.chatStopWatch = new StopWatch();
         this.chatStopWatch.start();
-
         this.bulletCooldown = new StopWatch();
         this.bulletCooldown.start();
-
         this.webSocket.on('message', this.onMessageHandler.bind(this));
         this.webSocket.on('close', this.onDisconnect.bind(this));
+    }
+
+    /**
+     * クライアントからのメッセージを処理する
+     * @param {*} reader 
+     */
+    onMessageHandler(event) {
+        const reader = new BinaryReader(event);
+        // パケットのタイプを取得する
+        const type = reader.getUint8();
+        switch (type) {
+            case 0: // ゲームの開始
+                this.onGamePlay(reader);
+                break;
+            case 1: // 観戦の開始
+                this.onSpectate(reader);
+                break;
+            case 2: // プレイヤーの動作
+                this.onMove(reader);
+                break;
+            case 100: // チャットの追加
+                this.onAddChat(reader);
+                break;
+            default:
+                break;
+        }
     }
 
     /**
@@ -59,7 +83,7 @@ module.exports = class Player {
         const message = reader.getString();
         // チャットの内容をチェックする
         if (this.gameServer.command.checkRemoteCommand(message)) {
-            this.gameServer.command.execute(message);
+            this.gameServer.command.execute(this, message);
             this.gameServer.logger.log(`[Command] ${this.character.name ?? '名前無し'}: ${message}`);
         } else {
             // チャットのクールタイムをチェックする
@@ -89,32 +113,6 @@ module.exports = class Player {
     }
 
     /**
-     * クライアントからのメッセージを処理する
-     * @param {*} reader 
-     */
-    onMessageHandler(event) {
-        const reader = new BinaryReader(event);
-        // パケットのタイプを取得する
-        const type = reader.getUint8();
-        switch (type) {
-            case 0: // ゲームの開始
-                this.onGamePlay(reader);
-                break;
-            case 1: // 観戦の開始
-                this.onSpectate(reader);
-                break;
-            case 2: // プレイヤーの動作
-                this.onMove(reader);
-                break;
-            case 100: // チャットの追加
-                this.onAddChat(reader);
-                break;
-            default:
-                break;
-        }
-    }
-
-    /**
      * クライアントへのパケットを送信する
      * @param {*} writer 
      */
@@ -135,18 +133,13 @@ module.exports = class Player {
         this.gameServer.removeQuadtreePosition(this.character);
     }
 
+    /**
+     * 弾の発射
+     * @returns 
+     */
     onShootBullet() {
         if (this.bulletCooldown.getElapsedTime() < 1000) return;
-        const bullet = new Bullet(
-            this,
-            this.gameServer.getGenerateId(),
-            this.character.position.copy(),
-            this.character.direction,
-            10,
-            20);
-        this.gameServer.addBullet(bullet);
-        // console.log(bullet)
-
+        this.gameServer.shootBullet(this);
         this.bulletCooldown.reset();
         this.bulletCooldown.start();
     }

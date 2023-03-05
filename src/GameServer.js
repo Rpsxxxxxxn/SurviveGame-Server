@@ -21,6 +21,7 @@ const Utils = require("./common/Utils");
 const ObjectNode = require("./common/ObjectNode");
 const Vector2 = require("./common/Vector2");
 const UpdateBullets = require("./packet/UpdateBullets");
+const Bullet = require("./entity/Bullet");
 
 module.exports = class GameServer {
     constructor() {
@@ -120,7 +121,7 @@ module.exports = class GameServer {
         const targetCharacters = this.characters.filter(character => character.isAlive && Utils.isNotEmpty(character.parent));
         this.characters.forEach((character) => {
             targetCharacters.forEach(target => {
-                if (character.id !== target.id && character.parent !== target.parent) {
+                if (character.id !== target.id && character.type === 1) {
                     character.targetTrackingMove(target);
                 }
             });
@@ -168,7 +169,7 @@ module.exports = class GameServer {
      * @returns 
      */
     onRigidbodyCollision(self, target) {
-        if (self.id === target.id) return; // 自分自身との衝突は無視
+        if (self.id === target.id || self.type !== target.type) return; // 自分自身との衝突は無視
         const radius = self.size + target.size;
         const distance = self.position.distance(target.position);
         const push = Math.min((radius - distance) / distance, radius - distance);
@@ -427,7 +428,7 @@ module.exports = class GameServer {
      */
     checkFrameRate() {
         if (this.frameRate < 5) {
-            throw new Error('FrameRate is too low.');
+            // throw new Error('FrameRate is too low.');
         }
     }
 
@@ -466,9 +467,25 @@ module.exports = class GameServer {
      * プレイヤーの追加
      */
     addEnemyCharacter() {
-        const enemy = new Character(null, this.getGenerateId());
+        const enemy = new Character(null, 1, this.getGenerateId());
         enemy.position.x = Math.random() * this.border.w;
         enemy.position.y = Math.random() * this.border.h;
         this.addCharacter(enemy);
+    }
+
+    /**
+     * 弾丸の発射
+     * @param {*} player 
+     */
+    shootBullet(player) {
+        const bullet = new Bullet(
+            player,
+            1,
+            this.getGenerateId(),
+            player.character.position.copy(),
+            player.character.direction,
+            10,
+            20);
+        this.addBullet(bullet);
     }
 }

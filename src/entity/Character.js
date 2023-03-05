@@ -1,8 +1,10 @@
+const Rectangle = require("../common/Rectangle");
 const Vector2 = require("../common/Vector2");
 
 module.exports = class Character {
-    constructor(parent, id) {
+    constructor(parent, type, id) {
         this.parent = parent; // 親クラス
+        this.type = type; // タイプ (0: プレイヤー, 1: 敵)
         this.id = id; // ID
         this.name = "テスト名"; // 名前
         this.position = new Vector2(0, 0); // 座標
@@ -21,8 +23,12 @@ module.exports = class Character {
         this.spd = 1; // 移動速度
 
         this.weapons = []; // 武器
-        this.viewerBox = { minX: 0, minY: 0, maxX: 0, maxY: 0 }; // 視界範囲
+        this.viewerBox = new Rectangle(0, 0, 100, 100); // 視界範囲
         this.quadTreeNode = null; // 4分木のノード
+    }
+
+    physicsUpdate() {
+        this.position.add(Vector2.fromAngle(this.velocity).mulScalar(10));
     }
 
     /**
@@ -30,8 +36,8 @@ module.exports = class Character {
      * @param {*} direction 
      */
     directionMove(direction) {
-        this.position.x += Math.cos(direction) * 1;
-        this.position.y += Math.sin(direction) * 1;
+        this.position.x += Math.cos(direction) * this.spd;
+        this.position.y += Math.sin(direction) * this.spd;
     }
 
     /**
@@ -57,63 +63,13 @@ module.exports = class Character {
     }
 
     /**
-     * 弾の衝突判定
-     * @param {*} bullet 
-     * @returns 
-     */
-    checkBulletCollision(bullet) {
-        const distance = this.position.distance(bullet.position);
-        if (distance < 1) {
-            this.hp -= bullet.damage;
-            if (this.hp <= 0) {
-                this.isAlive = false;
-            }
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * 円形の衝突判定
-     * @param {*} target 
-     * @returns 
-     */
-    circleRigidbody(target) {
-        const distance = this.position.distance(target.position);
-        if (distance < 1) return;
-        const direction = this.position.direction(target.position);
-        const force = 1 / distance;
-        this.position.x += Math.cos(direction) * force;
-        this.position.y += Math.sin(direction) * force;
-    }
-
-    /**
-     * 視界範囲の更新
-     * @param {*} query 
-     * @returns 
-     */
-    updateViewerBoxFilter(query) {
-        this.viewerBox.minX = this.position.x - query.range;
-        this.viewerBox.minY = this.position.y - query.range;
-        this.viewerBox.maxX = this.position.x + query.range;
-        this.viewerBox.maxY = this.position.y + query.range;
-
-        if (this.viewerBox.minX < 0) this.viewerBox.minX = 0;
-        if (this.viewerBox.minY < 0) this.viewerBox.minY = 0;
-        if (this.viewerBox.maxX > 100) this.viewerBox.maxX = 100;
-        if (this.viewerBox.maxY > 100) this.viewerBox.maxY = 100;
-
-        return this.viewerBox;
-    }
-
-    /**
      * 視界範囲の更新
      */
     updateViewerBox() {
-        this.viewerBox.minX = this.position.x - 0.5;
-        this.viewerBox.minY = this.position.y - 0.5;
-        this.viewerBox.maxX = this.position.x + 0.5;
-        this.viewerBox.maxY = this.position.y + 0.5;
+        this.viewerBox.x = this.position.x - this.size * 2;
+        this.viewerBox.y = this.position.y - this.size * 2;
+        this.viewerBox.w = this.position.x + this.size * 2;
+        this.viewerBox.h = this.position.y + this.size * 2;
     }
 
     /**
@@ -123,11 +79,11 @@ module.exports = class Character {
      * @param {*} maxX 
      * @param {*} maxY 
      */
-    setViewerBox(minX, minY, maxX, maxY) {
-        this.viewerBox.minX = minX;
-        this.viewerBox.minY = minY;
-        this.viewerBox.maxX = maxX;
-        this.viewerBox.maxY = maxY;
+    setViewerBox(x, y, w, h) {
+        this.viewerBox.x = x;
+        this.viewerBox.y = y;
+        this.viewerBox.w = w;
+        this.viewerBox.h = h;
     }
 
     /**
@@ -146,6 +102,10 @@ module.exports = class Character {
         return new Vector2((this.viewerBox.minX + this.viewerBox.maxX) / 2, (this.viewerBox.minY + this.viewerBox.maxY) / 2);
     }
 
+    /**
+     * サイズの二乗を取得する
+     * @returns 
+     */
     getSquaredSize() {
         return this.size * this.size;
     }

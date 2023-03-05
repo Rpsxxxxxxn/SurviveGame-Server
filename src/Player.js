@@ -5,6 +5,8 @@ const AddChat = require("./packet/AddChat");
 const { WebSocket } = require("ws");
 const BinaryReader = require("./common/BinaryReader");
 const Bullet = require("./entity/Bullet");
+const Utils = require("./common/Utils");
+const UpdateCharacters = require("./packet/UpdateCharacters");
 
 module.exports = class Player {
     /**
@@ -21,8 +23,26 @@ module.exports = class Player {
         this.chatStopWatch.start();
         this.bulletCooldown = new StopWatch();
         this.bulletCooldown.start();
-        this.webSocket.on('message', this.onMessageHandler.bind(this));
-        this.webSocket.on('close', this.onDisconnect.bind(this));
+        this.closestEnemy = null;
+        this.spectatePlayer = null;
+        if (this.webSocket) {
+            this.webSocket.on('message', this.onMessageHandler.bind(this));
+            this.webSocket.on('close', this.onDisconnect.bind(this));
+        }
+    }
+
+    onUpdate() {
+        const viewNodes = this.gameServer.onQueryQuadtreeRectangle(this.character.getViewerBox());
+        const updateCharacters = viewNodes.map(node => node.object).filter(object => object.type === 0 || object.type === 1);
+        this.gameServer.onBroadcastPacket(new UpdateCharacters(updateCharacters));
+
+        updateCharacters.forEach(character => {
+            if (character.type === 1) {
+                if (this.character.isAlive && this.character.position.distance(character.position) < 100) {
+                    this.closestEnemy = character;
+                }
+            }
+        });
     }
 
     /**
@@ -31,19 +51,27 @@ module.exports = class Player {
      */
     onMessageHandler(event) {
         const reader = new BinaryReader(event);
+        // パケットのサイズが0または2048バイト以上の場合は受け取らない
+        if (reader.view.byteLength === 0 && reader.view.byteLength > 2048) {
+            return;
+        }
+
         // パケットのタイプを取得する
         const type = reader.getUint8();
         switch (type) {
-            case 0: // ゲームの開始
+            case 0x00: // ゲームの開始
                 this.onGamePlay(reader);
                 break;
-            case 1: // 観戦の開始
+            case 0x01: // 観戦の開始
                 this.onSpectate(reader);
                 break;
-            case 2: // プレイヤーの動作
+            case 0x02: // プレイヤーの動作
                 this.onMove(reader);
                 break;
-            case 100: // チャットの追加
+            case 0x03: // ショップ選択
+                this.onShopSelect(reader);
+                break;
+            case 0x64: // チャットの追加
                 this.onAddChat(reader);
                 break;
             default:
@@ -61,7 +89,7 @@ module.exports = class Player {
         this.character.name = reader.getString();
         this.character.isAlive = true;
         this.character.position = Vector2.random();
-        this.gameServer.addChat(null, "ゲームに入室しました。");
+        this.gameServer.onAddChat(null, "ゲームに入室しました。");
     }
 
     /**
@@ -71,7 +99,11 @@ module.exports = class Player {
      */
     onSpectate(reader) {
         if (this.character.isAlive) return;
-        const player = this.gameServer.clients.find(client => client.score);
+        if (Utils.isNotEmpty(this.spectatePlayer)) {
+            this.spectatePlayer = null;
+        }
+        // 観戦するプレイヤーを選択する
+        this.spectatePlayer = this.gameServer.players.reduce((a, b) => { return Math.max(a.character.score, b.character.score) });
         player.onSendPacket(new AddChat(this, `${this.character.name ?? '名前無し'}が観戦しています。`));
     }
 
@@ -93,7 +125,7 @@ module.exports = class Player {
             }
             // チャットの長さをチェックする
             if (message.length > 0 && message.length < this.gameServer.config.PlayerChatLength) {
-                this.gameServer.addChat(this, message);
+                this.gameServer.onAddChat(this, message);
                 this.chatStopWatch.reset();
                 this.chatStopWatch.start();
                 this.gameServer.logger.chat(this.webSocket._socket.remoteAddress, `${this.character.name ?? '名前無し'}: ${message}`);
@@ -113,6 +145,19 @@ module.exports = class Player {
     }
 
     /**
+     * ショップの選択
+     * @param {*} reader 
+     */
+    onShopSelect(reader) {
+        if (!this.character.isAlive) return;
+        const shopId = reader.getUint8();
+        const shop = this.gameServer.shops.find(shop => shop.id === shopId);
+        if (shop) {
+            shop.onSelect(this);
+        }
+    }
+
+    /**
      * クライアントへのパケットを送信する
      * @param {*} writer 
      */
@@ -128,9 +173,8 @@ module.exports = class Player {
      */
     onDisconnect() {
         this.character.isAlive = false;
-        this.gameServer.removePlayer(this);
-        this.gameServer.removeCharacter(this.character);
-        this.gameServer.removeQuadtreePosition(this.character);
+        this.gameServer.onRemovePlayer(this);
+        this.gameServer.onRemoveCharacter(this.character);
     }
 
     /**
@@ -139,7 +183,12 @@ module.exports = class Player {
      */
     onShootBullet() {
         if (this.bulletCooldown.getElapsedTime() < 1000) return;
-        this.gameServer.shootBullet(this);
+        if (this.closestEnemy) {
+            const direction = this.character.position.direction(this.closestEnemy.position);
+            this.gameServer.onShootBullet(this, direction);
+        } else {
+            this.gameServer.onShootBullet(this);
+        }
         this.bulletCooldown.reset();
         this.bulletCooldown.start();
     }

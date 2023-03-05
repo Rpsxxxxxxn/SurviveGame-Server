@@ -6,15 +6,15 @@ module.exports = class Bullet {
      * @param {*} parent 
      * @param {*} id 
      * @param {*} position 
-     * @param {*} velocity 
+     * @param {*} direction 
      * @param {*} damage 
      */
-    constructor(parent, type, id, position, velocity, damage) {
+    constructor(parent, type, id, position, direction, damage) {
         this.parent = parent; // 親
         this.type = type; // 0: プレイヤー, 1: 敵 
         this.id = id; // ID
         this.position = position; // 位置
-        this.velocity = velocity; // 速度
+        this.direction = direction; // 速度
         this.damage = damage; // ダメージ
         this.size = 5; // サイズ
         this.isAlive = true; // 生存状態
@@ -25,8 +25,9 @@ module.exports = class Bullet {
     /**
      * 物理更新
      */
-    physicsUpdate() {
-        this.position.add(Vector2.fromAngle(this.velocity).mulScalar(10));
+    onPhysicsUpdate(border) {
+        this.position.add(Vector2.fromAngle(this.direction).mulScalar(10));
+        this.onUpdateAlive(border);
     }
 
     /**
@@ -36,15 +37,7 @@ module.exports = class Bullet {
      */
     onCollision(other) {
         if (other instanceof Bullet) return;
-        this.gameServer.removeBullet(this);
-    }
-
-    /**
-     * 位置を設定する
-     * @param {*} velocity 
-     */
-    setVelocity(velocity) {
-        this.velocity = velocity;
+        this.gameServer.onRemoveBullet(this);
     }
 
     /**
@@ -76,6 +69,16 @@ module.exports = class Bullet {
      */
     getSquaredSize() {
         return this.size * this.size;
+    }
+
+    onUpdateAlive(border) {
+        if (!this.isAlive) return;
+        if (this.position.x < border.x ||
+            this.position.x > border.w ||
+            this.position.y < border.y ||
+            this.position.y > border.h) {
+            this.isAlive = false;
+        }
     }
 
     

@@ -126,6 +126,11 @@ module.exports = class Utils {
         return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
     }
 
+    /**
+     * 16進数からRGBに変換する
+     * @param {*} hex 
+     * @returns 
+     */
     static getHexToRgb(hex) {
         const rgb = [];
         for (let i = 0; i < 3; i++) {
@@ -134,6 +139,11 @@ module.exports = class Utils {
         return rgb;
     }
 
+    /**
+     * RGBから16進数に変換する
+     * @param {*} rgb 
+     * @returns 
+     */
     static getRgbToHex(rgb) {
         let hex = '#';
         for (let i = 0; i < 3; i++) {
@@ -141,4 +151,23 @@ module.exports = class Utils {
         }
         return hex;
     }
+
+    /**
+     * 配列の最大値を取得する
+     * @param {*} array 
+     * @returns 
+     */
+    static getArrayMax(array) {
+        return array.reduce((a, b) => Math.max(a, b));
+    }
+
+    /**
+     * 配列の最小値を取得する
+     * @param {*} array 
+     * @returns 
+     */
+    static getArrayMin(array) {
+        return array.reduce((a, b) => Math.min(a, b));
+    }
+
 }

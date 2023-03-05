@@ -1,4 +1,5 @@
 const Rectangle = require("../common/Rectangle");
+const Utils = require("../common/Utils");
 const Vector2 = require("../common/Vector2");
 
 module.exports = class Character {
@@ -22,13 +23,15 @@ module.exports = class Character {
         this.luk = 1; // クリティカル率
         this.spd = 1; // 移動速度
 
-        this.weapons = []; // 武器
         this.viewerBox = new Rectangle(0, 0, 100, 100); // 視界範囲
         this.quadTreeNode = null; // 4分木のノード
     }
 
-    physicsUpdate() {
-        this.position.add(Vector2.fromAngle(this.velocity).mulScalar(10));
+    /**
+     * フレーム更新
+     */
+    onPhysicsUpdate() {
+        this.updateViewerBox();
     }
 
     /**
@@ -66,10 +69,10 @@ module.exports = class Character {
      * 視界範囲の更新
      */
     updateViewerBox() {
-        this.viewerBox.x = this.position.x - this.size * 2;
-        this.viewerBox.y = this.position.y - this.size * 2;
-        this.viewerBox.w = this.position.x + this.size * 2;
-        this.viewerBox.h = this.position.y + this.size * 2;
+        this.viewerBox.x = this.position.x;
+        this.viewerBox.y = this.position.y;
+        this.viewerBox.w = 600;
+        this.viewerBox.h = 600;
     }
 
     /**
@@ -108,5 +111,13 @@ module.exports = class Character {
      */
     getSquaredSize() {
         return this.size * this.size;
+    }
+
+    /**
+     * 4分木のノードを設定する
+     * @returns 
+     */
+    getScore() {
+        return this.score;
     }
 }

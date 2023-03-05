@@ -21,6 +21,9 @@ module.exports = class Command {
             case 'godmode':
                 this.godMode(player);
                 break;
+            case 'userlist_all':
+                this.userListAll(player);
+                break;
             default:
                 player.onSendPacket(new AddChat(null, `コマンドが見つかりません。`));
                 break;
@@ -38,7 +41,7 @@ module.exports = class Command {
         player.character.luk = 9999;
         player.character.spd = 9999;
         player.character.vit = 9999;
-        player.onSendPacket(new AddChat(null, `コマンドが見つかりません。`));
+        player.onSendPacket(new AddChat(null, `ALL BUFFが適用されました。`));
     }
 
     /**
@@ -53,7 +56,21 @@ module.exports = class Command {
         player.character.luk = 9999;
         player.character.spd = 9999;
         player.character.vit = 9999;
-        player.onSendPacket(new AddChat(null, `コマンドが見つかりません。`));
+        player.onSendPacket(new AddChat(null, `GOD MODEが適用されました。`));
+    }
+
+    /**
+     * サーバーに接続している全てのプレイヤーを表示する
+     */
+    userListAll(player) {
+        player.onSendPacket(new AddChat(null, 'IP, ID, 名前'));
+        this.gameServer.players.forEach(player => {
+            const message = `
+            ${player.webSocket._socket.remoteAddress},
+            ${player.character.id},
+            ${player.character.name}`;
+            player.onSendPacket(new AddChat(null, message));
+        });
     }
 
     /**

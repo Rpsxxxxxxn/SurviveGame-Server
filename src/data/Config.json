@@ -1,6 +1,6 @@
 {
     "ServerPort": 9000,
-    "ServerName": "ラムネサバイバー",
+    "ServerName": "ラムネ",
     "ServerDescription": "このモードは、協力のモードです。",
     "ServerStartMessage": "ようこそ！",
     "ServerLoopInterval": 40,

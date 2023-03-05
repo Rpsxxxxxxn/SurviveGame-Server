@@ -22,6 +22,7 @@ const ObjectNode = require("./common/ObjectNode");
 const Vector2 = require("./common/Vector2");
 const UpdateBullets = require("./packet/UpdateBullets");
 const Bullet = require("./entity/Bullet");
+const UpdateLevel = require("./packet/UpdateLevel");
 
 module.exports = class GameServer {
     constructor() {
@@ -40,6 +41,7 @@ module.exports = class GameServer {
         this.gameExp = 0; // 経験値
         this.gameStage = 1; // ステージ
 
+        this.dummyPlayer = new Player(this, null, 0);
         this.border = this.config.BorderSize;
         this.quadtree = new QuadTree(new Rectangle(this.border.x, this.border.y, this.border.w, this.border.h), 8);
         this.webSocketServer = new WebSocket.Server({ port: this.config.ServerPort });
@@ -47,15 +49,7 @@ module.exports = class GameServer {
         this.loadIPBanList();
 
         for (let i = 0; i < 200; i++) {
-            this.addEnemyCharacter();
-        }
-    }
-
-    addExp(exp) {
-        this.gameExp += exp;
-        if (this.gameExp >= this.gameLevel * 100) {
-            this.gameLevel++;
-            this.gameExp = 0;
+            this.onAddEnemyCharacter();
         }
     }
 
@@ -75,26 +69,16 @@ module.exports = class GameServer {
      * サーバーのループ処理
      */
     mainloop() {
-        // if (this.checkGameEnd()) {
-        //     this.stopWatch.stop();
-        //     this.logger.log("Game end.");
-        // }
-
+        // オブジェクトの更新
         this.objectUpdate();
 
-        this.broadcastPacket(new UpdateCharacters(this.characters));
-        this.broadcastPacket(new UpdateBullets(this.bullets));
+        // this.onBroadcastPacket(new UpdateCharacters(this.characters));
+        this.onBroadcastPacket(new UpdateBullets(this.bullets));
         
         this.calcDeltaTime();
         this.calcFrameRate();
         this.checkDeltaTime();
         this.checkFrameRate();
-
-        // this.broadcastPacket(new UpdateServerUsage(
-        //     this.getCpuUsage(),
-        //     this.getMemoryUsage(),
-        //     this.deltaTime,
-        //     this.frameRate));
         setTimeout(this.mainloop.bind(this), this.config.ServerLoopInterval);
     }
 
@@ -117,27 +101,92 @@ module.exports = class GameServer {
         // プレイヤーの更新
         this.players.forEach(player => {
             player.onShootBullet();
+            player.onUpdate();
         });
-        const targetCharacters = this.characters.filter(character => character.isAlive && Utils.isNotEmpty(character.parent));
+        // 目標にするキャラクターを取得する
+        const targetPlayer = this.getMaxScorePlayer()
+        // キャラクターの更新
         this.characters.forEach((character) => {
-            targetCharacters.forEach(target => {
-                if (character.id !== target.id && character.type === 1) {
-                    character.targetTrackingMove(target);
-                }
-            });
-            this.queryQuadtree(character).forEach((target) => {
+            // 目標にするキャラクターを設定する
+            if (Utils.isNotEmpty(targetPlayer) && character.type === 1) {
+                character.targetTrackingMove(targetPlayer.character);
+            }
+            this.onQueryQuadtree(character).forEach((target) => {
                 this.onRigidbodyCollision(character, target.object);
             });
+            character.onPhysicsUpdate();
             character.positionMoveLimit(this.border);
-            this.updateQuadtreePosition(character);
+            this.onUpdateQuadtreePosition(character);
         });
+        // 弾の更新
         this.bullets.forEach((bullet) => {
-            // this.queryQuadtree(bullet).forEach((target) => {
-            //     this.onBulletCollision(bullet, target.object);
-            // });
-            this.updateQuadtreePosition(bullet);
-            bullet.physicsUpdate();
+            bullet.onPhysicsUpdate(this.border);
+            this.onUpdateQuadtreePosition(bullet);
+            // if (!this.isAlive) {
+            //     this.onRemoveBullet(bullet);
+            // }
         });
+    }
+
+    /**
+     * 最大スコアのプレイヤーを取得する
+     * @returns 
+     */
+    getMaxScorePlayer() {
+        let maxPlayer = null;
+        this.players.forEach((player) => {
+            if (Utils.isEmpty(maxPlayer) || maxPlayer.character.getScore() < player.character.getScore()) {
+                maxPlayer = player;
+            }
+        });
+        return maxPlayer;
+    }
+
+    /**
+     * 経験値の追加
+     * @param {*} exp 
+     */
+    onAddExp(exp) {
+        this.gameExp += exp;
+        if (this.gameExp >= this.gameLevel * 100) {
+            this.gameLevel++;
+            this.gameExp = 0;
+        }
+        // レベルアップの通知
+        this.onBroadcastPacket(new UpdateLevel(this.gameLevel, this.gameExp));
+    }
+
+    /**
+     * 敵キャラクターの追加
+     * @param {*} position 
+     */
+    onAddEnemyCharacter(position) {
+        const enemyCharacter = new Character(null, 1, this.getGenerateId());
+        // 指定された位置に配置
+        if (Utils.isNotEmpty(position)) {
+            enemyCharacter.position = position;
+        } else {
+            // ランダムな位置に配置
+            enemyCharacter.position.x = Math.random() * this.border.w;
+            enemyCharacter.position.y = Math.random() * this.border.h;
+        }
+        this.onAddCharacter(enemyCharacter);
+    }
+
+    /**
+     * 弾丸の発射
+     * @param {*} player 
+     */
+    onShootBullet(player, direction) {
+        const bullet = new Bullet(
+            player, // 発射したプレイヤー
+            2, // 弾丸の種類
+            this.getGenerateId(), // ID
+            player.character.position.copy(), // 位置
+            Utils.isNotEmpty(direction) ? direction : Math.PI * Math.random(), // 方向
+            10, // 速度
+            20); // 攻撃力
+        this.onAddBullet(bullet);
     }
 
     /**
@@ -157,7 +206,7 @@ module.exports = class GameServer {
         character.hp -= bullet.damage;
         if (character.hp <= 0) {
             character.isAlive = false;
-            // this.broadcastPacket(new UpdatePlayers(this.players));
+            // this.onBroadcastPacket(new UpdatePlayers(this.players));
         }
         bullet.isAlive = false;
     }
@@ -189,7 +238,7 @@ module.exports = class GameServer {
      * プレイヤー位置の追加
      * @param {*} character 
      */
-    appendQuadtreePosition(character) {
+    onAppendQuadtreePosition(character) {
         // 既に追加済みの場合は処理しない
         if (Utils.isNotEmpty(character.quadTreeNode)) {
             return;
@@ -207,7 +256,7 @@ module.exports = class GameServer {
      * プレイヤーの位置の更新
      * @param {*} character 
      */
-    updateQuadtreePosition(character) {
+    onUpdateQuadtreePosition(character) {
         // 位置が変わっていない場合は処理しない
         if (character.quadTreeNode.x === character.position.x - character.size &&
             character.quadTreeNode.y === character.position.y - character.size &&
@@ -216,15 +265,15 @@ module.exports = class GameServer {
             return;
         }
 
-        this.removeQuadtreePosition(character);
-        this.appendQuadtreePosition(character);
+        this.onRemoveQuadtreePosition(character);
+        this.onAppendQuadtreePosition(character);
     }
 
     /**
      * プレイヤー位置の削除
      * @param {*} character 
      */
-    removeQuadtreePosition(character) {
+    onRemoveQuadtreePosition(character) {
         // 位置が設定されていない場合は処理しない
         if (Utils.isEmpty(character.quadTreeNode)) {
             return;
@@ -238,8 +287,13 @@ module.exports = class GameServer {
      * @param {*} character 
      * @returns 
      */
-    queryQuadtree(value) {
+    onQueryQuadtree(value) {
         const result = this.quadtree.query(value.quadTreeNode);
+        return result;
+    }
+
+    onQueryQuadtreeRectangle(rectangle) {
+        const result = this.quadtree.query(rectangle);
         return result;
     }
 
@@ -247,7 +301,7 @@ module.exports = class GameServer {
      * パケットのブロードキャスト
      * @param {*} packet 
      */
-    broadcastPacket(packet) {
+    onBroadcastPacket(packet) {
         // パケットの送信
         this.players.forEach(client => {
             client.onSendPacket(packet);
@@ -259,10 +313,10 @@ module.exports = class GameServer {
      * @param {*} sender 
      * @param {*} message 
      */
-    addChat(sender, message) {
+    onAddChat(sender, message) {
         // チャットの送信
         if (this.config.PlayerChatEnabled) {
-            this.broadcastPacket(new AddChat(sender, message));
+            this.onBroadcastPacket(new AddChat(sender, message));
         }
     }
 
@@ -270,7 +324,7 @@ module.exports = class GameServer {
      * プレイヤーの追加
      * @param {*} player 
      */
-    addPlayer(player) {
+    onAddPlayer(player) {
         this.players.push(player);
     }
 
@@ -278,7 +332,7 @@ module.exports = class GameServer {
      * プレイヤーの削除
      * @param {*} player 
      */
-    removePlayer(player) {
+    onRemovePlayer(player) {
         this.players.splice(this.players.indexOf(player), 1);
     }
 
@@ -286,36 +340,36 @@ module.exports = class GameServer {
      * キャラクターの追加
      * @param {*} character 
      */
-    addCharacter(character) {
+    onAddCharacter(character) {
         this.characters.push(character);
-        this.appendQuadtreePosition(character);
+        this.onAppendQuadtreePosition(character);
     }
 
     /**
      * キャラクターの削除
      * @param {*} character 
      */
-    removeCharacter(character) {
+    onRemoveCharacter(character) {
         this.characters.splice(this.characters.indexOf(character), 1);
-        this.removeQuadtreePosition(character);
+        this.onRemoveQuadtreePosition(character);
     }
 
     /**
      * 弾の追加
      * @param {*} bullet 
      */
-    addBullet(bullet) {
+    onAddBullet(bullet) {
         this.bullets.push(bullet);
-        this.appendQuadtreePosition(bullet);
+        this.onAppendQuadtreePosition(bullet);
     }
 
     /**
      * 弾の削除
      * @param {*} bullet 
      */
-    removeBullet(bullet) {
+    onRemoveBullet(bullet) {
         this.bullets.splice(this.bullets.indexOf(bullet), 1);
-        this.removeQuadtreePosition(bullet);
+        this.onRemoveQuadtreePosition(bullet);
     }
 
     /**
@@ -335,8 +389,8 @@ module.exports = class GameServer {
         player.onSendPacket(new AddBorder(this.border));
 
         // プレイヤーの追加
-        this.addPlayer(player);
-        this.addCharacter(player.character);
+        this.onAddPlayer(player);
+        this.onAddCharacter(player.character);
 
         player.onSendPacket(new UpdatePlayers(this.players));
         player.onSendPacket(new TrackingId(player.character.id));   
@@ -436,7 +490,7 @@ module.exports = class GameServer {
      * IPアドレスの禁止
      * @param {*} ip 
      */
-    addIPBanned(ip) {
+    onAddIPBanned(ip) {
         this.ipBanList.push(ip);
     }
 
@@ -466,26 +520,11 @@ module.exports = class GameServer {
     /**
      * プレイヤーの追加
      */
-    addEnemyCharacter() {
-        const enemy = new Character(null, 1, this.getGenerateId());
-        enemy.position.x = Math.random() * this.border.w;
-        enemy.position.y = Math.random() * this.border.h;
-        this.addCharacter(enemy);
-    }
-
-    /**
-     * 弾丸の発射
-     * @param {*} player 
-     */
-    shootBullet(player) {
-        const bullet = new Bullet(
-            player,
-            1,
-            this.getGenerateId(),
-            player.character.position.copy(),
-            player.character.direction,
-            10,
-            20);
-        this.addBullet(bullet);
+    onBroadcastUpdateServerUsage() {
+        this.onBroadcastPacket(new UpdateServerUsage(
+            this.getCpuUsage(),
+            this.getMemoryUsage(),
+            this.deltaTime,
+            this.frameRate));
     }
 }

@@ -1,3 +1,5 @@
+const BinaryWriter = require("../common/BinaryWriter");
+
 module.exports = class AddDamageText {
     /**
      * ダメージテキストを追加するパケットを生成する
@@ -10,9 +12,9 @@ module.exports = class AddDamageText {
 
     getPacket() {
         this.writer.setUint8(0x09); // パケットID
-        this.writer.setFloat32(this.damageText.x); // ダメージテキストの位置
-        this.writer.setFloat32(this.damageText.y); // ダメージテキストの位置
-        this.writer.setUint32(this.damageText.damage); // ダメージ
+        this.writer.setFloat32(this.damageText.position.x); // ダメージテキストの位置
+        this.writer.setFloat32(this.damageText.position.y); // ダメージテキストの位置
+        this.writer.setString(this.damageText.text); // ダメージ
 
         const damageTextColor = this.damageText.getColorToRGB();
         this.writer.setUint8(damageTextColor.r); // 赤

@@ -7,6 +7,7 @@ const BinaryReader = require("./common/BinaryReader");
 const Bullet = require("./entity/Bullet");
 const Utils = require("./common/Utils");
 const UpdateCharacters = require("./packet/UpdateCharacters");
+const UpdateBullets = require("./packet/UpdateBullets");
 
 module.exports = class Player {
     /**
@@ -34,12 +35,18 @@ module.exports = class Player {
     onUpdate() {
         const viewNodes = this.gameServer.onQueryQuadtreeRectangle(this.character.getViewerBox());
         const updateCharacters = viewNodes.map(node => node.object).filter(object => object.type === 0 || object.type === 1);
-        this.gameServer.onBroadcastPacket(new UpdateCharacters(updateCharacters));
+        this.onSendPacket(new UpdateCharacters(updateCharacters));
 
+        const viewsBullets = viewNodes.map(node => node.object).filter(object => object.type === 2);
+        this.onSendPacket(new UpdateBullets(viewsBullets));
+        // 一番近い敵を探す
+        let minDist = this.gameServer.border.w;
         updateCharacters.forEach(character => {
             if (character.type === 1) {
-                if (this.character.isAlive && this.character.position.distance(character.position) < 100) {
+                let distance = this.character.position.distance(character.position);
+                if (distance < minDist) {
                     this.closestEnemy = character;
+                    minDist = distance;
                 }
             }
         });
@@ -141,7 +148,7 @@ module.exports = class Player {
         if (!this.character.isAlive) return;
         const direction = reader.getUint8();
         this.character.direction = direction * (Math.PI / 4);
-        this.character.position.add(Vector2.fromAngle(this.character.direction).mulScalar(4));
+        this.character.position.add(Vector2.fromAngle(this.character.direction).mulScalar(2));
     }
 
     /**
@@ -182,10 +189,13 @@ module.exports = class Player {
      * @returns 
      */
     onShootBullet() {
-        if (this.bulletCooldown.getElapsedTime() < 1000) return;
+        if (this.bulletCooldown.getElapsedTime() < 100) return;
         if (this.closestEnemy) {
             const direction = this.character.position.direction(this.closestEnemy.position);
             this.gameServer.onShootBullet(this, direction);
+
+            this.gameServer.onShootBullet(this, direction - Math.PI * 0.1);
+            this.gameServer.onShootBullet(this, direction + Math.PI * 0.1);
         } else {
             this.gameServer.onShootBullet(this);
         }

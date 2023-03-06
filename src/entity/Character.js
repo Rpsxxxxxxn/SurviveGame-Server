@@ -1,30 +1,25 @@
 const Rectangle = require("../common/Rectangle");
-const Utils = require("../common/Utils");
 const Vector2 = require("../common/Vector2");
+const NodeData = require("./NodeData");
 
-module.exports = class Character {
+module.exports = class Character extends NodeData {
     constructor(parent, type, id) {
+        super(id, type, new Vector2(0, 0), 24);
         this.parent = parent; // 親クラス
-        this.type = type; // タイプ (0: プレイヤー, 1: 敵)
-        this.id = id; // ID
-        this.name = "テスト名"; // 名前
-        this.position = new Vector2(0, 0); // 座標
-        this.direction = 0; // 0: up, 1: right, 2: down, 3: left
+        this.name = ""; // 名前
+        this.score = 0; // スコア
+        this.direction = 0; // Math.PI * 4 * Direction
         this.isAlive = true; // 生存状態
-        this.score = 0;
-        this.size = 24; // サイズ (半径)
 
-        // ステータス
         this.hp = 100; // 体力
         this.str = 10; // 物理攻撃力
         this.vit = 5; // 防御力
         this.dex = 1; // 攻撃速度
         this.int = 1; // 魔法攻撃力
-        this.luk = 1; // クリティカル率
+        this.luk = 0.1; // クリティカル率
         this.spd = 1; // 移動速度
 
         this.viewerBox = new Rectangle(0, 0, 100, 100); // 視界範囲
-        this.quadTreeNode = null; // 4分木のノード
     }
 
     /**

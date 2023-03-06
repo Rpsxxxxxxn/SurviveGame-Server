@@ -3,7 +3,7 @@
     "ServerName": "ラムネ",
     "ServerDescription": "このモードは、協力のモードです。",
     "ServerStartMessage": "ようこそ！",
-    "ServerLoopInterval": 40,
+    "ServerLoopInterval": 25,
 
     "ServerEndTime": 1800000,
     "ServerStageEnd": 300000,

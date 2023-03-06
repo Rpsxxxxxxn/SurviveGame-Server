@@ -1,6 +1,7 @@
 const Vector2 = require("../common/Vector2");
+const NodeData = require("./NodeData");
 
-module.exports = class Bullet {
+module.exports = class Bullet extends NodeData {
     /**
      * 弾のクラス
      * @param {*} parent 
@@ -9,24 +10,19 @@ module.exports = class Bullet {
      * @param {*} direction 
      * @param {*} damage 
      */
-    constructor(parent, type, id, position, direction, damage) {
-        this.parent = parent; // 親
-        this.type = type; // 0: プレイヤー, 1: 敵 
-        this.id = id; // ID
-        this.position = position; // 位置
+    constructor(parent, id, position, direction, damage) {
+        super(id, 2, position, 5);
+        this.parent = parent; // 親クラス
         this.direction = direction; // 速度
         this.damage = damage; // ダメージ
-        this.size = 5; // サイズ
         this.isAlive = true; // 生存状態
-
-        this.quadTreeNode = null; // 4分木のノード
     }
 
     /**
      * 物理更新
      */
     onPhysicsUpdate(border) {
-        this.position.add(Vector2.fromAngle(this.direction).mulScalar(10));
+        this.position.add(Vector2.fromAngle(this.direction).mulScalar(15));
         this.onUpdateAlive(border);
     }
 
@@ -71,6 +67,11 @@ module.exports = class Bullet {
         return this.size * this.size;
     }
 
+    /**
+     * 生存状態を更新する
+     * @param {*} border 
+     * @returns 
+     */
     onUpdateAlive(border) {
         if (!this.isAlive) return;
         if (this.position.x < border.x ||
@@ -80,6 +81,4 @@ module.exports = class Bullet {
             this.isAlive = false;
         }
     }
-
-    
 }

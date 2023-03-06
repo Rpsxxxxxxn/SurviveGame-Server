@@ -23,6 +23,8 @@ const Vector2 = require("./common/Vector2");
 const UpdateBullets = require("./packet/UpdateBullets");
 const Bullet = require("./entity/Bullet");
 const UpdateLevel = require("./packet/UpdateLevel");
+const AddDamageText = require("./packet/AddDamageText");
+const DamageText = require("./entity/DamageText");
 
 module.exports = class GameServer {
     constructor() {
@@ -32,6 +34,8 @@ module.exports = class GameServer {
         this.stopWatch = new StopWatch();
         this.movePacketWatch = new StopWatch();
         this.generateId = 0;
+        this.generateCharacterId = 0;
+        this.generateBulletId = 0;
         this.players = [];
         this.characters = [];
         this.bullets = [];
@@ -41,7 +45,6 @@ module.exports = class GameServer {
         this.gameExp = 0; // 経験値
         this.gameStage = 1; // ステージ
 
-        this.dummyPlayer = new Player(this, null, 0);
         this.border = this.config.BorderSize;
         this.quadtree = new QuadTree(new Rectangle(this.border.x, this.border.y, this.border.w, this.border.h), 8);
         this.webSocketServer = new WebSocket.Server({ port: this.config.ServerPort });
@@ -71,15 +74,28 @@ module.exports = class GameServer {
     mainloop() {
         // オブジェクトの更新
         this.objectUpdate();
-
-        // this.onBroadcastPacket(new UpdateCharacters(this.characters));
-        this.onBroadcastPacket(new UpdateBullets(this.bullets));
+        this.gameStageUpdate();
         
         this.calcDeltaTime();
         this.calcFrameRate();
         this.checkDeltaTime();
         this.checkFrameRate();
+
+        if (~~this.getElapsedTimeSecond() % 5 === 0) {
+            this.onBroadcastUpdateServerUsage();
+        }
+
         setTimeout(this.mainloop.bind(this), this.config.ServerLoopInterval);
+    }
+
+    gameStageUpdate() {
+        const enemyCount = this.characters.filter(character => character.type === 1).length;
+        if (enemyCount === 0) {
+            this.gameStage++;
+            for (let i = 0; i < 200; i++) {
+                this.onAddEnemyCharacter();
+            }
+        }
     }
 
     getElapsedTimeSecond() {
@@ -117,14 +133,28 @@ module.exports = class GameServer {
             character.onPhysicsUpdate();
             character.positionMoveLimit(this.border);
             this.onUpdateQuadtreePosition(character);
+            if (!character.isAlive) {
+                this.onRemoveCharacter(character);
+            }
         });
         // 弾の更新
         this.bullets.forEach((bullet) => {
             bullet.onPhysicsUpdate(this.border);
             this.onUpdateQuadtreePosition(bullet);
-            // if (!this.isAlive) {
-            //     this.onRemoveBullet(bullet);
-            // }
+
+            this.onQueryQuadtreeRectangle(new Rectangle(
+                bullet.position.x - 200,
+                bullet.position.y - 200,
+                bullet.position.x + 200,
+                bullet.position.y + 200)).forEach((target) => {
+                if (target.object.type === 1) {
+                    this.onBulletCollision(target.object, bullet);
+                }
+            });
+
+            if (!bullet.isAlive) {
+                this.onRemoveBullet(bullet);
+            }
         });
     }
 
@@ -178,14 +208,24 @@ module.exports = class GameServer {
      * @param {*} player 
      */
     onShootBullet(player, direction) {
+        const position = player.character.position.copy();
+
+        const shootDirection = Utils.isNotEmpty(direction) ? direction : Math.PI * Math.random();
+        // プレイヤーの中心位置
+        position.add(new Vector2(player.character.size, player.character.size));
+        // 発射位置
+        const shootPosition = position.add(
+            new Vector2(
+                Math.cos(shootDirection) * player.character.size,
+                Math.sin(shootDirection) * player.character.size));
+        
+        // 弾丸の追加
         const bullet = new Bullet(
             player, // 発射したプレイヤー
-            2, // 弾丸の種類
-            this.getGenerateId(), // ID
-            player.character.position.copy(), // 位置
-            Utils.isNotEmpty(direction) ? direction : Math.PI * Math.random(), // 方向
-            10, // 速度
-            20); // 攻撃力
+            this.getGenerateBulletId(), // ID
+            shootPosition, // 位置
+            shootDirection, // 方向
+            player.character.str); // 攻撃力
         this.onAddBullet(bullet);
     }
 
@@ -195,20 +235,43 @@ module.exports = class GameServer {
      * @param {*} bullet 
      * @returns 
      */
-    onBulletCollision(character, bullet) {
+    onBulletCollision(enemy, bullet) {
         // 自分の弾に当たった場合は処理しない
-        if (Utils.isNotEmpty(character.parent) && character.id === bullet.parent.id) {
+        if (Utils.isNotEmpty(enemy.parent)) {
             return;
         }
-        const distance = character.position.distance(bullet.position);
-        if (distance > character.size + bullet.size) return; // 衝突していない
+        const distance = enemy.position.distance(bullet.position);
+        if (distance > enemy.size + bullet.size) return; // 衝突していない
 
-        character.hp -= bullet.damage;
-        if (character.hp <= 0) {
-            character.isAlive = false;
-            // this.onBroadcastPacket(new UpdatePlayers(this.players));
+        // ダメージを与える
+        // console.log(bullet);
+
+        let damage = bullet.damage;
+        const clitical = Math.random() < bullet.parent.character.luk;
+        if (clitical) {
+            damage = bullet.damage * 2;
+            this.onAddDamageText(enemy.position.copy().addScalar(enemy.size), `${damage}`, 'FFFF00');
+        } else {
+            this.onAddDamageText(enemy.position.copy().addScalar(enemy.size), `${damage}`, 'FFFFFF');
+        }
+        enemy.hp -= damage;
+        if (enemy.hp <= 0) {
+            enemy.isAlive = false;
+            enemy.score += damage;
         }
         bullet.isAlive = false;
+    }
+
+    /**
+     * ダメージテキストの追加
+     * @param {*} showPosition 
+     * @param {*} text 
+     * @param {*} color 
+     */
+    onAddDamageText(showPosition, text, color) {
+        this.onBroadcastPacket(
+            new AddDamageText(
+                new DamageText(showPosition.x, showPosition.y, text, color)));
     }
 
     /**
@@ -236,50 +299,50 @@ module.exports = class GameServer {
 
     /**
      * プレイヤー位置の追加
-     * @param {*} character 
+     * @param {*} nodeData 
      */
-    onAppendQuadtreePosition(character) {
+    onAppendQuadtreePosition(nodeData) {
         // 既に追加済みの場合は処理しない
-        if (Utils.isNotEmpty(character.quadTreeNode)) {
+        if (Utils.isNotEmpty(nodeData.quadTreeNode)) {
             return;
         }
         // プレイヤーの位置を追加
         const objectNode = new ObjectNode(
-            character.position.x - character.size,
-            character.position.y - character.size,
-            character.size * 2, character.size * 2, character);
-        character.quadTreeNode = objectNode;
+            nodeData.position.x - nodeData.size,
+            nodeData.position.y - nodeData.size,
+            nodeData.size * 2, nodeData.size * 2, nodeData);
+        nodeData.quadTreeNode = objectNode;
         this.quadtree.insert(objectNode);
     }
 
     /**
      * プレイヤーの位置の更新
-     * @param {*} character 
+     * @param {*} nodeData 
      */
-    onUpdateQuadtreePosition(character) {
+    onUpdateQuadtreePosition(nodeData) {
         // 位置が変わっていない場合は処理しない
-        if (character.quadTreeNode.x === character.position.x - character.size &&
-            character.quadTreeNode.y === character.position.y - character.size &&
-            character.quadTreeNode.w === character.size * 2 &&
-            character.quadTreeNode.h === character.size * 2) {
+        if (nodeData.quadTreeNode.x === nodeData.position.x - nodeData.size &&
+            nodeData.quadTreeNode.y === nodeData.position.y - nodeData.size &&
+            nodeData.quadTreeNode.w === nodeData.size * 2 &&
+            nodeData.quadTreeNode.h === nodeData.size * 2) {
             return;
         }
 
-        this.onRemoveQuadtreePosition(character);
-        this.onAppendQuadtreePosition(character);
+        this.onRemoveQuadtreePosition(nodeData);
+        this.onAppendQuadtreePosition(nodeData);
     }
 
     /**
      * プレイヤー位置の削除
-     * @param {*} character 
+     * @param {*} nodeData 
      */
-    onRemoveQuadtreePosition(character) {
+    onRemoveQuadtreePosition(nodeData) {
         // 位置が設定されていない場合は処理しない
-        if (Utils.isEmpty(character.quadTreeNode)) {
+        if (Utils.isEmpty(nodeData.quadTreeNode)) {
             return;
         }
-        this.quadtree.remove(character.quadTreeNode);
-        character.quadTreeNode = null;
+        this.quadtree.remove(nodeData.quadTreeNode);
+        nodeData.quadTreeNode = null;
     }
 
     /**
@@ -288,13 +351,16 @@ module.exports = class GameServer {
      * @returns 
      */
     onQueryQuadtree(value) {
-        const result = this.quadtree.query(value.quadTreeNode);
-        return result;
+        return this.quadtree.query(value.quadTreeNode);
     }
 
+    /**
+     * クエリーの実行　矩形
+     * @param {*} rectangle 
+     * @returns 
+     */
     onQueryQuadtreeRectangle(rectangle) {
-        const result = this.quadtree.query(rectangle);
-        return result;
+        return this.quadtree.query(rectangle);
     }
 
     /**
@@ -410,6 +476,13 @@ module.exports = class GameServer {
             this.generateId = 0;
         }
         return this.generateId++;
+    }
+
+    getGenerateBulletId() {
+        if (this.generateBulletId >= 999999999) {
+            this.generateBulletId = 0;
+        }
+        return this.generateBulletId++;
     }
 
     /**

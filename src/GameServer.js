@@ -25,6 +25,8 @@ const Bullet = require("./entity/Bullet");
 const UpdateLevel = require("./packet/UpdateLevel");
 const AddDamageText = require("./packet/AddDamageText");
 const DamageText = require("./entity/DamageText");
+const UpdateLeaderboard = require("./packet/UpdateLeaderboard");
+const ExpRamune = require("./entity/ExpRamune");
 
 module.exports = class GameServer {
     constructor() {
@@ -39,6 +41,7 @@ module.exports = class GameServer {
         this.players = [];
         this.characters = [];
         this.bullets = [];
+        this.expRamunes = [];
         this.deltaTime = 0;
 
         this.gameLevel = 1; // レベル
@@ -51,7 +54,7 @@ module.exports = class GameServer {
         this.webSocketServer.on('connection', this.onConnection.bind(this));
         this.loadIPBanList();
 
-        for (let i = 0; i < 200; i++) {
+        for (let i = 0; i < 10; i++) {
             this.onAddEnemyCharacter();
         }
     }
@@ -81,7 +84,8 @@ module.exports = class GameServer {
         this.checkDeltaTime();
         this.checkFrameRate();
 
-        if (~~this.getElapsedTimeSecond() % 5 === 0) {
+
+        if (~~(this.stopWatch.getElapsedTime() % this.config.ServerLoopInterval) == 0) {
             this.onBroadcastUpdateServerUsage();
         }
 
@@ -92,14 +96,16 @@ module.exports = class GameServer {
         const enemyCount = this.characters.filter(character => character.type === 1).length;
         if (enemyCount === 0) {
             this.gameStage++;
-            for (let i = 0; i < 200; i++) {
+
+            let enemyCount = (10 * this.gameStage) > 200 ? 200 : (10 * this.gameStage);
+            for (let i = 0; i < enemyCount; i++) {
                 this.onAddEnemyCharacter();
             }
         }
     }
 
     getElapsedTimeSecond() {
-        return this.stopWatch.getElapsedTime() / 1000;
+        return ~~(this.stopWatch.getElapsedTime() / 1000);
     }
 
     /**
@@ -143,10 +149,10 @@ module.exports = class GameServer {
             this.onUpdateQuadtreePosition(bullet);
 
             this.onQueryQuadtreeRectangle(new Rectangle(
-                bullet.position.x - 200,
-                bullet.position.y - 200,
-                bullet.position.x + 200,
-                bullet.position.y + 200)).forEach((target) => {
+                bullet.position.x - bullet.size * 4,
+                bullet.position.y - bullet.size * 4,
+                bullet.position.x + bullet.size * 4,
+                bullet.position.y + bullet.size * 4)).forEach((target) => {
                 if (target.object.type === 1) {
                     this.onBulletCollision(target.object, bullet);
                 }
@@ -154,6 +160,23 @@ module.exports = class GameServer {
 
             if (!bullet.isAlive) {
                 this.onRemoveBullet(bullet);
+            }
+        });
+        // 経験値の更新
+        this.expRamunes.forEach((expRamune) => {
+            this.onQueryQuadtreeRectangle(new Rectangle(
+                expRamune.position.x - expRamune.size * 4,
+                expRamune.position.y - expRamune.size * 4,
+                expRamune.position.x + expRamune.size * 4,
+                expRamune.position.y + expRamune.size * 4)).forEach((target) => {
+                if (target.object.type === 0) {
+                    this.onExpRamuneCollision(target.object, expRamune);
+                }
+            });
+            expRamune.onPhysicsUpdate(this.border);
+            this.onUpdateQuadtreePosition(expRamune);
+            if (!expRamune.isAlive) {
+                this.onRemoveExpRamune(expRamune);
             }
         });
     }
@@ -230,36 +253,87 @@ module.exports = class GameServer {
     }
 
     /**
+     * らむねとの衝突判定
+     * @param {*} character 
+     * @param {*} expRamune 
+     * @returns 
+     */
+    onExpRamuneCollision(character, expRamune) {
+        if (this.isDetectCollisionCircle(character, expRamune)) {
+            return;
+        }
+        expRamune.isAlive = false;
+        this.onAddExp(expRamune.exp);
+        this.onRemoveExpRamune(expRamune);
+    }
+
+    /**
+     * 当たり判定の検知
+     * @param {*} character 
+     * @param {*} target 
+     * @returns 
+     */
+    isDetectCollisionCircle(character, target) {
+        // 自分の弾に当たった場合は処理しない
+        if (character.type === 0) {
+            return true;
+        }
+        const distance = character.position.distance(target.position);
+        return distance > character.size + target.size;
+    }
+
+    /**
      * キャラクターの衝突判定
      * @param {*} character 
      * @param {*} bullet 
      * @returns 
      */
     onBulletCollision(enemy, bullet) {
-        // 自分の弾に当たった場合は処理しない
-        if (Utils.isNotEmpty(enemy.parent)) {
+        if (this.isDetectCollisionCircle(enemy, bullet)) {
             return;
         }
-        const distance = enemy.position.distance(bullet.position);
-        if (distance > enemy.size + bullet.size) return; // 衝突していない
-
-        // ダメージを与える
-        // console.log(bullet);
-
-        let damage = bullet.damage;
+        // ダメージ計算
+        let damage = bullet.damage - enemy.vit;
         const clitical = Math.random() < bullet.parent.character.luk;
+        const damagePosition = enemy.position.copy().addScalar(enemy.size);
         if (clitical) {
             damage = bullet.damage * 2;
-            this.onAddDamageText(enemy.position.copy().addScalar(enemy.size), `${damage}`, 'FFFF00');
+            this.onAddDamageText(damagePosition, `${damage}`, 'FFFF00');
         } else {
-            this.onAddDamageText(enemy.position.copy().addScalar(enemy.size), `${damage}`, 'FFFFFF');
+            this.onAddDamageText(damagePosition, `${damage}`, 'FFFFFF');
         }
         enemy.hp -= damage;
         if (enemy.hp <= 0) {
             enemy.isAlive = false;
-            enemy.score += damage;
+            this.onBroadcastPacket(new UpdateLeaderboard(this.players));
+            this.onAddExpRamune(new ExpRamune(
+                this.getGenerateId(),
+                damagePosition.x,
+                damagePosition.y,
+                24,
+                this.gameLevel * 10));
         }
+        bullet.parent.character.score += damage;
         bullet.isAlive = false;
+    }
+
+    /**
+     * 経験値の追加
+     * @param {*} ramune 
+     */
+    onAddExpRamune(ramune) {
+        this.expRamunes.push(ramune);
+        this.onAppendQuadtreePosition(ramune);
+
+    }
+
+    /**
+     * 経験値の削除
+     * @param {*} ramune 
+     */
+    onRemoveExpRamune(ramune) {
+        this.expRamunes = this.expRamunes.splice(this.expRamunes.indexOf(ramune), 1);
+        this.onRemoveQuadtreePosition(ramune);
     }
 
     /**
@@ -269,9 +343,7 @@ module.exports = class GameServer {
      * @param {*} color 
      */
     onAddDamageText(showPosition, text, color) {
-        this.onBroadcastPacket(
-            new AddDamageText(
-                new DamageText(showPosition.x, showPosition.y, text, color)));
+        this.onBroadcastPacket(new AddDamageText(new DamageText(showPosition.x, showPosition.y, text, color)));
     }
 
     /**
@@ -459,6 +531,7 @@ module.exports = class GameServer {
         this.onAddCharacter(player.character);
 
         player.onSendPacket(new UpdatePlayers(this.players));
+        player.onSendPacket(new UpdateLeaderboard(this.players));
         player.onSendPacket(new TrackingId(player.character.id));   
         player.onSendPacket(new AddChat(null, `${this.config.ServerName}`));
         player.onSendPacket(new AddChat(null, `${this.config.ServerDescription}`));

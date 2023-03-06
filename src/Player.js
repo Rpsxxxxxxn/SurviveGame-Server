@@ -34,13 +34,14 @@ module.exports = class Player {
 
     onUpdate() {
         const viewNodes = this.gameServer.onQueryQuadtreeRectangle(this.character.getViewerBox());
-        const updateCharacters = viewNodes.map(node => node.object).filter(object => object.type === 0 || object.type === 1);
+        const updateCharacters = viewNodes.map(node => node.object).filter(object => object.type === 0 || object.type === 1 || object.type === 3);
         this.onSendPacket(new UpdateCharacters(updateCharacters));
 
         const viewsBullets = viewNodes.map(node => node.object).filter(object => object.type === 2);
         this.onSendPacket(new UpdateBullets(viewsBullets));
         // 一番近い敵を探す
         let minDist = this.gameServer.border.w;
+        this.closestEnemy = null;
         updateCharacters.forEach(character => {
             if (character.type === 1) {
                 let distance = this.character.position.distance(character.position);
@@ -189,11 +190,13 @@ module.exports = class Player {
      * @returns 
      */
     onShootBullet() {
-        if (this.bulletCooldown.getElapsedTime() < 100) return;
+        if (this.bulletCooldown.getElapsedTime() < 250) return;
         if (this.closestEnemy) {
             const direction = this.character.position.direction(this.closestEnemy.position);
             this.gameServer.onShootBullet(this, direction);
 
+            this.gameServer.onShootBullet(this, direction - Math.PI * 0.05);
+            this.gameServer.onShootBullet(this, direction + Math.PI * 0.05);
             this.gameServer.onShootBullet(this, direction - Math.PI * 0.1);
             this.gameServer.onShootBullet(this, direction + Math.PI * 0.1);
         } else {

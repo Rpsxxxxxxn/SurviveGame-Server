@@ -18,9 +18,9 @@ module.exports = class UpdateLeaderboard {
         this.writer.setUint8(0x03);
         this.writer.setUint8(this.players.length);
         this.players.forEach(player => {
-            this.writer.setUint8(player.id);
-            this.writer.setString(player.name);
-            this.writer.setUint16(player.score);
+            this.writer.setUint32(player.character.id);
+            this.writer.setString(player.character.name);
+            this.writer.setUint32(player.character.score);
         });
         return this.writer.toBuffer();
     }

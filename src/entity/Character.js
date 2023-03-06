@@ -22,6 +22,16 @@ module.exports = class Character extends NodeData {
         this.viewerBox = new Rectangle(0, 0, 100, 100); // 視界範囲
     }
 
+    setStatus(hp, str, vit, dex, int, luk, spd) {
+        this.hp = hp;
+        this.str = str;
+        this.vit = vit;
+        this.dex = dex;
+        this.int = int;
+        this.luk = luk;
+        this.spd = spd;
+    }
+
     /**
      * フレーム更新
      */

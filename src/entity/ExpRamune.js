@@ -1,4 +1,5 @@
 const Rectangle = require("../common/Rectangle");
+const Utils = require("../common/Utils");
 const Vector2 = require("../common/Vector2");
 const NodeData = require("./NodeData");
 
@@ -14,6 +15,11 @@ module.exports = class ExpRamune extends NodeData {
     constructor(id, x, y, size, exp) {
         super(id, 3, new Vector2(x, y), size);
         this.exp = exp; // 経験値
+        this.targetCharacter = null;
+    }
+
+    setTargetCharacter(character) {
+        this.targetCharacter = character;
     }
 
     /**
@@ -21,8 +27,8 @@ module.exports = class ExpRamune extends NodeData {
      * @param {*} direction 
      */
     directionMove(direction) {
-        this.position.x += Math.cos(direction) * 1;
-        this.position.y += Math.sin(direction) * 1;
+        this.position.x += Math.cos(direction) * 5;
+        this.position.y += Math.sin(direction) * 5;
     }
 
     /**
@@ -30,10 +36,13 @@ module.exports = class ExpRamune extends NodeData {
      * @param {*} target 
      * @returns 
      */
-    trackingMove(target) {
-        const distance = this.position.distance(target.position);
+    trackingMove() {
+        if (Utils.isEmpty(this.targetCharacter)) {
+            return;
+        }
+        const distance = this.position.distance(this.targetCharacter.position);
         if (distance < 1) return;
-        this.directionMove(this.position.direction(target.position));
+        this.directionMove(this.position.direction(this.targetCharacter.position));
     }
 
     /**
@@ -45,9 +54,9 @@ module.exports = class ExpRamune extends NodeData {
             this.position.x > border.w ||
             this.position.y < border.y ||
             this.position.y > border.h) {
-                console.log("ExpRamune is out of border");
             this.isAlive = false;
         }
+        this.trackingMove();
     }
 
     /**

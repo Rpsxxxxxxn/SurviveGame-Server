@@ -3,8 +3,8 @@ const Vector2 = require("../common/Vector2");
 const NodeData = require("./NodeData");
 
 module.exports = class Character extends NodeData {
-    constructor(parent, type, id) {
-        super(id, type, new Vector2(0, 0), 24);
+    constructor(parent, type, id, position, size) {
+        super(id, type, position, size);
         this.parent = parent; // 親クラス
         this.name = ""; // 名前
         this.score = 0; // スコア

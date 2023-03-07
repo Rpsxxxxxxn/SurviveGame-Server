@@ -24,10 +24,34 @@ module.exports = class Command {
             case 'userlist_all':
                 this.userListAll(player);
                 break;
+            case 'gamelevel':
+                this.gameLevel(player, args[1]);
+                break;
+            case 'gamestage':
+                this.gameStage(player, args[1]);
+                break;
             default:
                 player.onSendPacket(new AddChat(null, `コマンドが見つかりません。`));
                 break;
         }
+    }
+
+    gameStage(player, stage) {
+        if (stage < 1 || stage > 999) {
+            player.onSendPacket(new AddChat(null, `ステージは1~999の間で指定してください。`));
+            return;
+        }
+        this.gameServer.gameStage = stage;
+        player.onSendPacket(new AddChat(null, `ゲームステージが${stage}に設定されました。`));
+    }
+
+    gameLevel(player, level) {
+        if (level < 1 || level > 100) {
+            player.onSendPacket(new AddChat(null, `レベルは1~100の間で指定してください。`));
+            return;
+        }
+        this.gameServer.gameLevel = level;
+        player.onSendPacket(new AddChat(null, `ゲームレベルが${level}に設定されました。`));
     }
 
     /**

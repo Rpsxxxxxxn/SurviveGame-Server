@@ -22,10 +22,34 @@
     "MaxPlayers": 100,
     "MaxPlayerNameLength": 20,
 
+    "PlayerType": 0,
     "PlayerChatEnabled": true,
     "PlayerChatLength": 100,
     "PlayerChatCooldownEnabled": true,
     "PlayerChatCooldown": 1000,
+    "PlayerExpRamuneDistance": 300,
+    "PlayerSize": 24,
+
+    "EnemyType": 1,
+    "EnemyHPDead": 0,
+    "EnemySize": 24,
+    "EnemyStatusLevelUPHP": 100,
+    "EnemyStatusLevelUPVIT": 3,
+    "EnemyStatusLevelUPSTR": 10,
+    "EnemyStartCount": 10,
+
+    "BulletType": 2,
+    "BulletSize": 10,
+
+    "RamuneType": 3,
+    "RamuneSize": 24,
+    "RamuneExp": 10,
+    "RamuneRandomPositionRate": 0.5,
+
+    "GameNextLevelExp": 100,
+
+    "CliticalHitColor": "FFFF00",
+    "NormalHitColor": "FFFFFF",
 
     "MaxSpawnEnemies": 200,
     "MaxSpawnBullets": 500

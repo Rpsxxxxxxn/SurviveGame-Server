@@ -19,7 +19,7 @@ module.exports = class Player {
     constructor(gameServer, webSocket, id) {
         this.gameServer = gameServer;
         this.webSocket = webSocket;
-        this.character = new Character(this, 0, id);
+        this.character = new Character(this, 0, id, new Vector2(this.gameServer.border.w * .5, this.gameServer.border.h * .5), 24);
         this.chatStopWatch = new StopWatch();
         this.chatStopWatch.start();
         this.bulletCooldown = new StopWatch();
@@ -197,6 +197,11 @@ module.exports = class Player {
         if (this.closestEnemy) {
             const direction = this.character.position.direction(this.closestEnemy.position);
             this.gameServer.onShootBullet(this, direction);
+
+            this.gameServer.onShootBullet(this, direction - Math.PI * .2);
+            this.gameServer.onShootBullet(this, direction - Math.PI * .1);
+            this.gameServer.onShootBullet(this, direction + Math.PI * .2);
+            this.gameServer.onShootBullet(this, direction + Math.PI * .1);
         } else {
             this.gameServer.onShootBullet(this);
         }

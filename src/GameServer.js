@@ -55,7 +55,7 @@ module.exports = class GameServer {
         this.webSocketServer.on('connection', this.onConnection.bind(this));
 
         this.loadIPBanList();
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 5; i++) {
             this.onAddEnemyCharacter();
         }
     }
@@ -118,9 +118,9 @@ module.exports = class GameServer {
         this.checkDeltaTime();
         this.checkFrameRate();
 
-        if (~~(this.stopWatch.getElapsedTime() % this.config.ServerLoopInterval) == 0) {
-            this.onBroadcastUpdateServerUsage();
-        }
+        // if (~~(this.stopWatch.getElapsedTime() % this.config.ServerLoopInterval) == 0) {
+        //     this.onBroadcastUpdateServerUsage();
+        // }
 
         setTimeout(this.onMainloop.bind(this), this.config.ServerLoopInterval);
     }
@@ -171,12 +171,11 @@ module.exports = class GameServer {
                 bullet.onUpdatePhysics(this.border);
                 this.onUpdateQuadtreePosition(bullet);
                 // 弾の当たり判定
-                this.onQueryQuadtreeRectangle(bullet.onCollisionViewBox())
-                    .forEach((target) => {
-                        if (target.object.type === 1) {
-                            this.onBulletCollision(target.object, bullet);
-                        }
-                    });
+                this.onQueryQuadtreeRectangle(bullet.onCollisionViewBox()).forEach((target) => {
+                    if (target.object.type === 1) {
+                        this.onBulletCollision(target.object, bullet);
+                    }
+                });
             } else {
                 this.onRemoveBullet(bullet);
             }
@@ -192,13 +191,11 @@ module.exports = class GameServer {
             if (expRamune.isAlive) {
                 expRamune.onUpdatePhysics(this.border);
                 this.onUpdateQuadtreePosition(expRamune);
-                // 経験値の当たり判定
-                // this.onQueryQuadtreeRectangle(expRamune.onCollisionViewBox())
-                //     .forEach((target) => {
-                //         if (target.object.type === 0) {
-                //         }
-                //     });
                 this.players.forEach((player) => {
+                    const distance = player.character.position.distance(expRamune.position);
+                    if (distance < this.config.PlayerExpRamuneDistance) {
+                        expRamune.setTargetCharacter(player.character);
+                    }
                     this.onExpRamuneCollision(player.character, expRamune);
                 })
             }
@@ -212,7 +209,7 @@ module.exports = class GameServer {
     onAddExp(exp) {
         if (exp <= 0) return;
         this.gameExp += exp;
-        if (this.gameExp >= this.gameLevel * 100) {
+        if (this.gameExp >= this.gameLevel * this.config.GameNextLevelExp) {
             this.gameLevel++;
             this.gameExp = 0;
         }
@@ -225,7 +222,7 @@ module.exports = class GameServer {
      * @param {*} position 
      */
     onAddEnemyCharacter(position) {
-        const enemyCharacter = new Character(null, 1, this.getGenerateId());
+        const enemyCharacter = new Character(null, 1, this.getGenerateId(), new Vector2(0, 0), 24);
         // 指定された位置に配置
         if (Utils.isNotEmpty(position)) {
             enemyCharacter.position = position;
@@ -234,6 +231,11 @@ module.exports = class GameServer {
             enemyCharacter.position.x = Math.random() * this.border.w;
             enemyCharacter.position.y = Math.random() * this.border.h;
         }
+        // ステータスの設定 ステージによって変更
+        enemyCharacter.hp = this.gameStage * this.config.EnemyStatusLevelUPHP;
+        enemyCharacter.vit = this.gameStage * this.config.EnemyStatusLevelUPVIT;
+        enemyCharacter.str = this.gameStage * this.config.EnemyStatusLevelUPSTR;
+
         this.onAddCharacter(enemyCharacter);
     }
 
@@ -256,7 +258,8 @@ module.exports = class GameServer {
             this.getGenerateBulletId(), // ID
             shootPosition, // 位置
             shootDirection, // 方向
-            player.character.str); // 攻撃力
+            player.character.str,
+            this.config.BulletSize); // 攻撃力
         this.onAddBullet(bullet);
     }
 
@@ -267,12 +270,11 @@ module.exports = class GameServer {
      * @returns 
      */
     onExpRamuneCollision(character, expRamune) {
-        if (character.type === 1) {
+        if (character.type === this.config.EnemyType) {
             return;
         }
         if (this.isDetectCollisionCircle(character, expRamune)) {
             expRamune.setAlive(false);
-            console.log('onExpRamuneCollision')
             this.onAddExp(expRamune.exp);
             this.onRemoveExpRamune(expRamune);
         }
@@ -297,7 +299,7 @@ module.exports = class GameServer {
      */
     onBulletCollision(enemy, bullet) {
         // 自分の弾に当たった場合は処理しない
-        if (enemy.type === 0) {
+        if (enemy.type === this.config.PlayerType) {
             return true;
         }
         if (this.isDetectCollisionCircle(enemy, bullet)) {
@@ -306,17 +308,17 @@ module.exports = class GameServer {
             const damagePosition = enemy.position.copy().addScalar(enemy.size);
             if (bullet.parent.character.isCliticalHit()) {
                 damage *= 2;
-                this.onAddDamageText(damagePosition, `${damage}`, 'FFFF00');
+                this.onAddDamageText(damagePosition, `${damage}`, this.config.CliticalHitColor);
             } else {
-                this.onAddDamageText(damagePosition, `${damage}`, 'FFFFFF');
+                this.onAddDamageText(damagePosition, `${damage}`, this.config.NormalHitColor);
             }
     
             enemy.reduceHP(damage);
-            if (enemy.hp <= 0) {
+            if (enemy.hp <= this.config.EnemyHPDead) {
                 enemy.setAlive(false);
                 this.onBroadcastPacket(new UpdateLeaderboard(this.players));
                 // 経験値の追加
-                this.onAddExpRamune(damagePosition, 24);
+                this.onAddExpRamune(damagePosition, this.config.RamuneSize);
             }
             bullet.parent.character.onAddScore(damage)
             bullet.setAlive(false);
@@ -507,10 +509,10 @@ module.exports = class GameServer {
         }
         const ramune = new ExpRamune(
             this.getGenerateId(),
-            position.x + (Math.random() - 0.5) * size,
-            position.y + (Math.random() - 0.5) * size,
+            position.x + (Math.random() - this.config.RamuneRandomPositionRate) * size,
+            position.y + (Math.random() - this.config.RamuneRandomPositionRate) * size,
             size,
-            this.gameLevel * 10);
+            this.gameLevel * this.config.RamuneExp);
         this.expRamunes.push(ramune);
         this.onAppendQuadtreePosition(ramune);
     }
@@ -523,7 +525,7 @@ module.exports = class GameServer {
         if (Utils.isEmpty(ramune)) {
             return;
         }
-        this.expRamunes = this.expRamunes.splice(this.expRamunes.indexOf(ramune), 1);
+        this.expRamunes.splice(this.expRamunes.indexOf(ramune), 1);
         this.onRemoveQuadtreePosition(ramune);
     }
 
@@ -561,11 +563,22 @@ module.exports = class GameServer {
         const enemyCount = this.characters.filter(character => character.type === 1).length;
         if (enemyCount === 0) {
             this.gameStage++;
-            let enemyCount = (10 * this.gameStage) > this.config.MaxSpawnEnemies ? this.config.MaxSpawnEnemies : (10 * this.gameStage);
+            let enemyCount = (this.config.EnemyStartCount * this.gameStage) > this.config.MaxSpawnEnemies ? this.config.MaxSpawnEnemies : (10 * this.gameStage);
             for (let i = 0; i < enemyCount; i++) {
                 this.onAddEnemyCharacter();
             }
         }
+    }
+
+    /**
+     * プレイヤーの追加
+     */
+    onBroadcastUpdateServerUsage() {
+        this.onBroadcastPacket(new UpdateServerUsage(
+            this.getCpuUsage(),
+            this.getMemoryUsage(),
+            this.deltaTime,
+            this.frameRate));
     }
 
     /**
@@ -723,16 +736,5 @@ module.exports = class GameServer {
      */
     checkIPBanned(ip) {
         return this.ipBanList.includes(ip);
-    }
-
-    /**
-     * プレイヤーの追加
-     */
-    onBroadcastUpdateServerUsage() {
-        this.onBroadcastPacket(new UpdateServerUsage(
-            this.getCpuUsage(),
-            this.getMemoryUsage(),
-            this.deltaTime,
-            this.frameRate));
     }
 }

@@ -11,8 +11,8 @@ module.exports = class Bullet extends NodeData {
      * @param {*} direction 
      * @param {*} damage 
      */
-    constructor(parent, id, position, direction, damage) {
-        super(id, 2, position, 5);
+    constructor(parent, id, position, direction, damage, size) {
+        super(id, 2, position, size);
         this.parent = parent; // 親クラス
         this.direction = direction; // 速度
         this.damage = damage; // ダメージ

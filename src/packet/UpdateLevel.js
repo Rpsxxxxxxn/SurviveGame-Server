@@ -12,7 +12,7 @@ module.exports = class UpdateLevel {
     }
     
     getPacket() {
-        this.writer.setUint8(0x11);
+        this.writer.setUint8(0x0B);
         this.writer.setUint8(this.level);
         this.writer.setUint32(this.experience);
         return this.writer.toBuffer();

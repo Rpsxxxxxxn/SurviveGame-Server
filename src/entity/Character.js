@@ -9,7 +9,6 @@ module.exports = class Character extends NodeData {
         this.name = ""; // 名前
         this.score = 0; // スコア
         this.direction = 0; // Math.PI * 4 * Direction
-        this.isAlive = true; // 生存状態
 
         this.hp = 100; // 体力
         this.str = 10; // 物理攻撃力
@@ -32,10 +31,23 @@ module.exports = class Character extends NodeData {
         this.spd = spd;
     }
 
+    reduceHP(damage) {
+        this.hp -= damage;
+        if (this.hp < 0) this.hp = 0;
+    }
+
+    isCliticalHit() {
+        return Math.random() < this.luk;
+    }
+
+    onAddScore(score) {
+        this.score += score;
+    }
+
     /**
      * フレーム更新
      */
-    onPhysicsUpdate() {
+    onUpdatePhysics() {
         this.updateViewerBox();
     }
 

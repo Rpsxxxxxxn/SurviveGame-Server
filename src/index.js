@@ -2,8 +2,8 @@ const GameServer = require('./gameServer');
 
 const server = new GameServer();
 try {
-    server.startLogs();
-    server.mainloop();
+    server.onStartLogs();
+    server.onMainloop();
 } catch (err) {
     server.logger.error(err);
 }

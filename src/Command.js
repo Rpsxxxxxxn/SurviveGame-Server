@@ -35,12 +35,12 @@ module.exports = class Command {
      * @param {*} player 
      */
     allBuff(player) {
-        player.character.str = 9999;
-        player.character.dex = 9999;
-        player.character.int = 9999;
-        player.character.luk = 9999;
-        player.character.spd = 9999;
-        player.character.vit = 9999;
+        player.character.str = 10000;
+        player.character.dex = 1000;
+        player.character.int = 1000;
+        player.character.luk = 1;
+        player.character.spd = 50;
+        player.character.vit = 10000;
         player.onSendPacket(new AddChat(null, `ALL BUFFが適用されました。`));
     }
 
@@ -49,13 +49,11 @@ module.exports = class Command {
      * @param {*} player 
      */
     godMode(player) {
-        player.character.hp = 9999;
-        player.character.str = 9999;
-        player.character.dex = 9999;
-        player.character.int = 9999;
-        player.character.luk = 9999;
-        player.character.spd = 9999;
-        player.character.vit = 9999;
+        player.character.hp = 10000;
+        player.character.str = 10000;
+        player.character.dex = 10;
+        player.character.luk = .5;
+        player.character.vit = 10000;
         player.onSendPacket(new AddChat(null, `GOD MODEが適用されました。`));
     }
 

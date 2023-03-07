@@ -32,6 +32,9 @@ module.exports = class Player {
         }
     }
 
+    /**
+     * プレイヤーの更新
+     */
     onUpdate() {
         const viewNodes = this.gameServer.onQueryQuadtreeRectangle(this.character.getViewerBox());
         const updateCharacters = viewNodes.map(node => node.object).filter(object => object.type === 0 || object.type === 1 || object.type === 3);
@@ -190,19 +193,22 @@ module.exports = class Player {
      * @returns 
      */
     onShootBullet() {
-        if (this.bulletCooldown.getElapsedTime() < 250) return;
+        if (this.getBulletCooldown()) return;
         if (this.closestEnemy) {
             const direction = this.character.position.direction(this.closestEnemy.position);
             this.gameServer.onShootBullet(this, direction);
-
-            this.gameServer.onShootBullet(this, direction - Math.PI * 0.05);
-            this.gameServer.onShootBullet(this, direction + Math.PI * 0.05);
-            this.gameServer.onShootBullet(this, direction - Math.PI * 0.1);
-            this.gameServer.onShootBullet(this, direction + Math.PI * 0.1);
         } else {
             this.gameServer.onShootBullet(this);
         }
         this.bulletCooldown.reset();
         this.bulletCooldown.start();
+    }
+
+    /**
+     * 弾のクールタイムをチェックする
+     * @returns 
+     */
+    getBulletCooldown() {
+        return this.bulletCooldown.getElapsedTime() < (1000 / this.character.dex);
     }
 }

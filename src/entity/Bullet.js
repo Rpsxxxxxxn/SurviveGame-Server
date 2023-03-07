@@ -1,3 +1,4 @@
+const Rectangle = require("../common/Rectangle");
 const Vector2 = require("../common/Vector2");
 const NodeData = require("./NodeData");
 
@@ -15,13 +16,20 @@ module.exports = class Bullet extends NodeData {
         this.parent = parent; // 親クラス
         this.direction = direction; // 速度
         this.damage = damage; // ダメージ
-        this.isAlive = true; // 生存状態
+    }
+
+    /**
+     * ダメージを設定する
+     * @param {*} damage 
+     */
+    setDamage(damage) {
+        this.damage = damage;
     }
 
     /**
      * 物理更新
      */
-    onPhysicsUpdate(border) {
+    onUpdatePhysics(border) {
         this.position.add(Vector2.fromAngle(this.direction).mulScalar(15));
         this.onUpdateAlive(border);
     }
@@ -80,5 +88,17 @@ module.exports = class Bullet extends NodeData {
             this.position.y > border.h) {
             this.isAlive = false;
         }
+    }
+
+    /**
+     * 衝突判定の矩形を取得する
+     * @returns 
+     */
+    onCollisionViewBox() {
+        return new Rectangle(
+            this.position.x,
+            this.position.y,
+            this.size * 5,
+            this.size * 5)
     }
 }

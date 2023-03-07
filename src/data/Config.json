@@ -27,6 +27,6 @@
     "PlayerChatCooldownEnabled": true,
     "PlayerChatCooldown": 1000,
 
-    "MaxSpawnEnemies": 500,
+    "MaxSpawnEnemies": 200,
     "MaxSpawnBullets": 500
 }

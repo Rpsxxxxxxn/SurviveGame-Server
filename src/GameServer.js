@@ -35,6 +35,7 @@ module.exports = class GameServer {
         this.command = new Command(this);
         this.stopWatch = new StopWatch();
         this.movePacketWatch = new StopWatch();
+
         this.generateId = 0;
         this.generateCharacterId = 0;
         this.generateBulletId = 0;
@@ -42,27 +43,57 @@ module.exports = class GameServer {
         this.characters = [];
         this.bullets = [];
         this.expRamunes = [];
-        this.deltaTime = 0;
-
+        
         this.gameLevel = 1; // レベル
         this.gameExp = 0; // 経験値
         this.gameStage = 1; // ステージ
-
-        this.border = this.config.BorderSize;
+        
+        this.deltaTime = 0;
+        this.border = this.config.BorderSize; // マップの大きさ
         this.quadtree = new QuadTree(new Rectangle(this.border.x, this.border.y, this.border.w, this.border.h), 8);
         this.webSocketServer = new WebSocket.Server({ port: this.config.ServerPort });
         this.webSocketServer.on('connection', this.onConnection.bind(this));
-        this.loadIPBanList();
 
+        this.loadIPBanList();
         for (let i = 0; i < 10; i++) {
             this.onAddEnemyCharacter();
         }
     }
 
     /**
+     * 接続時の処理
+     * @param {*} webSocket 
+     */
+    onConnection(webSocket) {
+        if (this.players.length >= this.config.MaxPlayers ||
+            // this.players.find(client => client.webSocket._socket.remoteAddress === webSocket._socket.remoteAddress) ||
+            this.checkIPBanned(webSocket._socket.remoteAddress)) {
+            webSocket.close();
+            return;
+        }
+        // プレイヤーの生成
+        const player = new Player(this, webSocket, this.getGenerateId());
+        player.onSendPacket(new UpdateServerInfo(this.config.ServerName, this.config.ServerDescription, 'ALPHA'));
+        player.onSendPacket(new AddBorder(this.border));
+
+        // プレイヤーの追加
+        this.onAddPlayer(player);
+        this.onAddCharacter(player.character);
+
+        player.onSendPacket(new UpdatePlayers(this.players));
+        player.onSendPacket(new UpdateLeaderboard(this.players));
+        player.onSendPacket(new TrackingId(player.character.id));   
+        player.onSendPacket(new AddChat(null, `${this.config.ServerName}`));
+        player.onSendPacket(new AddChat(null, `${this.config.ServerDescription}`));
+        player.onSendPacket(new AddChat(null, `${this.config.ServerStartMessage}`));
+
+        this.logger.log(`Player id: ${player.character.id} address: ${webSocket._socket.remoteAddress} port: ${webSocket._socket.remotePort}`);
+    }
+
+    /**
      * ゲームサーバーの開始ログ
      */
-    startLogs() {
+    onStartLogs() {
         this.logger.log("Server started.");
         this.logger.log(`ServerPort: ${this.config.ServerPort}`);
         this.logger.log(`Border: ${JSON.stringify(this.border)}`);
@@ -74,125 +105,104 @@ module.exports = class GameServer {
     /**
      * サーバーのループ処理
      */
-    mainloop() {
-        // オブジェクトの更新
-        this.objectUpdate();
-        this.gameStageUpdate();
+    onMainloop() {
+        this.onUpdatePlayer();
+        this.onUpdateCharacter();
+        this.onUpdateBullet();
+        this.onUpdateExp();
+
+        this.onUpdateGameStage();
         
         this.calcDeltaTime();
         this.calcFrameRate();
         this.checkDeltaTime();
         this.checkFrameRate();
 
-
         if (~~(this.stopWatch.getElapsedTime() % this.config.ServerLoopInterval) == 0) {
             this.onBroadcastUpdateServerUsage();
         }
 
-        setTimeout(this.mainloop.bind(this), this.config.ServerLoopInterval);
-    }
-
-    gameStageUpdate() {
-        const enemyCount = this.characters.filter(character => character.type === 1).length;
-        if (enemyCount === 0) {
-            this.gameStage++;
-
-            let enemyCount = (10 * this.gameStage) > 200 ? 200 : (10 * this.gameStage);
-            for (let i = 0; i < enemyCount; i++) {
-                this.onAddEnemyCharacter();
-            }
-        }
-    }
-
-    getElapsedTimeSecond() {
-        return ~~(this.stopWatch.getElapsedTime() / 1000);
-    }
-
-    /**
-     * ゲームが終了したかどうかを判定する
-     * @returns 
-     */
-    checkGameEnd() {
-        return this.stopWatch.getElapsedTime() > this.config.ServerEndTime;
+        setTimeout(this.onMainloop.bind(this), this.config.ServerLoopInterval);
     }
 
     /**
      * 更新処理
      */
-    objectUpdate() {
+    onUpdatePlayer() {
         // プレイヤーの更新
         this.players.forEach(player => {
             player.onShootBullet();
             player.onUpdate();
         });
+    }
+
+    /**
+     * キャラクターの更新
+     */
+    onUpdateCharacter() {
         // 目標にするキャラクターを取得する
-        const targetPlayer = this.getMaxScorePlayer()
+        const targetPlayer = this.getMaxScorePlayer();
         // キャラクターの更新
         this.characters.forEach((character) => {
-            // 目標にするキャラクターを設定する
-            if (Utils.isNotEmpty(targetPlayer) && character.type === 1) {
-                character.targetTrackingMove(targetPlayer.character);
-            }
-            this.onQueryQuadtree(character).forEach((target) => {
-                this.onRigidbodyCollision(character, target.object);
-            });
-            character.onPhysicsUpdate();
-            character.positionMoveLimit(this.border);
-            this.onUpdateQuadtreePosition(character);
-            if (!character.isAlive) {
+            if (character.isAlive) {
+                character.onUpdatePhysics();
+                // 目標にするキャラクターを設定する
+                if (Utils.isNotEmpty(targetPlayer) && character.type === 1) {
+                    character.targetTrackingMove(targetPlayer.character);
+                }
+                this.onQueryQuadtree(character).forEach((target) => {
+                    this.onRigidbodyCollision(character, target.object);
+                });
+                character.positionMoveLimit(this.border);
+                this.onUpdateQuadtreePosition(character);
+            } else {
                 this.onRemoveCharacter(character);
-            }
-        });
-        // 弾の更新
-        this.bullets.forEach((bullet) => {
-            bullet.onPhysicsUpdate(this.border);
-            this.onUpdateQuadtreePosition(bullet);
-
-            this.onQueryQuadtreeRectangle(new Rectangle(
-                bullet.position.x - bullet.size * 4,
-                bullet.position.y - bullet.size * 4,
-                bullet.position.x + bullet.size * 4,
-                bullet.position.y + bullet.size * 4)).forEach((target) => {
-                if (target.object.type === 1) {
-                    this.onBulletCollision(target.object, bullet);
-                }
-            });
-
-            if (!bullet.isAlive) {
-                this.onRemoveBullet(bullet);
-            }
-        });
-        // 経験値の更新
-        this.expRamunes.forEach((expRamune) => {
-            this.onQueryQuadtreeRectangle(new Rectangle(
-                expRamune.position.x - expRamune.size * 4,
-                expRamune.position.y - expRamune.size * 4,
-                expRamune.position.x + expRamune.size * 4,
-                expRamune.position.y + expRamune.size * 4)).forEach((target) => {
-                if (target.object.type === 0) {
-                    this.onExpRamuneCollision(target.object, expRamune);
-                }
-            });
-            expRamune.onPhysicsUpdate(this.border);
-            this.onUpdateQuadtreePosition(expRamune);
-            if (!expRamune.isAlive) {
-                this.onRemoveExpRamune(expRamune);
             }
         });
     }
 
     /**
-     * 最大スコアのプレイヤーを取得する
-     * @returns 
+     * 弾の更新
      */
-    getMaxScorePlayer() {
-        let maxPlayer = null;
-        this.players.forEach((player) => {
-            if (Utils.isEmpty(maxPlayer) || maxPlayer.character.getScore() < player.character.getScore()) {
-                maxPlayer = player;
+    onUpdateBullet() {
+        // 弾の更新
+        this.bullets.forEach((bullet) => {
+            if (bullet.isAlive) {
+                bullet.onUpdatePhysics(this.border);
+                this.onUpdateQuadtreePosition(bullet);
+                // 弾の当たり判定
+                this.onQueryQuadtreeRectangle(bullet.onCollisionViewBox())
+                    .forEach((target) => {
+                        if (target.object.type === 1) {
+                            this.onBulletCollision(target.object, bullet);
+                        }
+                    });
+            } else {
+                this.onRemoveBullet(bullet);
             }
         });
-        return maxPlayer;
+    }
+
+    /**
+     * 経験値の更新
+     */
+    onUpdateExp() {
+        // 経験値の更新
+        this.expRamunes.forEach((expRamune) => {
+            if (expRamune.isAlive) {
+                expRamune.onUpdatePhysics(this.border);
+                this.onUpdateQuadtreePosition(expRamune);
+                // 経験値の当たり判定
+                // this.onQueryQuadtreeRectangle(expRamune.onCollisionViewBox())
+                //     .forEach((target) => {
+                //         if (target.object.type === 0) {
+                //         }
+                //     });
+                this.players.forEach((player) => {
+                    this.onExpRamuneCollision(player.character, expRamune);
+                })
+            }
+        });
     }
 
     /**
@@ -200,6 +210,7 @@ module.exports = class GameServer {
      * @param {*} exp 
      */
     onAddExp(exp) {
+        if (exp <= 0) return;
         this.gameExp += exp;
         if (this.gameExp >= this.gameLevel * 100) {
             this.gameLevel++;
@@ -231,17 +242,14 @@ module.exports = class GameServer {
      * @param {*} player 
      */
     onShootBullet(player, direction) {
+        if (Utils.isEmpty(player)) {
+            return;
+        }
         const position = player.character.position.copy();
-
-        const shootDirection = Utils.isNotEmpty(direction) ? direction : Math.PI * Math.random();
-        // プレイヤーの中心位置
-        position.add(new Vector2(player.character.size, player.character.size));
-        // 発射位置
+        const shootDirection = Utils.isNotEmpty(direction) ? direction : (Math.PI * 2) * Math.random();
         const shootPosition = position.add(
-            new Vector2(
-                Math.cos(shootDirection) * player.character.size,
-                Math.sin(shootDirection) * player.character.size));
-        
+            new Vector2(Math.cos(shootDirection) * player.character.size,
+                        Math.sin(shootDirection) * player.character.size));
         // 弾丸の追加
         const bullet = new Bullet(
             player, // 発射したプレイヤー
@@ -259,12 +267,15 @@ module.exports = class GameServer {
      * @returns 
      */
     onExpRamuneCollision(character, expRamune) {
-        if (this.isDetectCollisionCircle(character, expRamune)) {
+        if (character.type === 1) {
             return;
         }
-        expRamune.isAlive = false;
-        this.onAddExp(expRamune.exp);
-        this.onRemoveExpRamune(expRamune);
+        if (this.isDetectCollisionCircle(character, expRamune)) {
+            expRamune.setAlive(false);
+            console.log('onExpRamuneCollision')
+            this.onAddExp(expRamune.exp);
+            this.onRemoveExpRamune(expRamune);
+        }
     }
 
     /**
@@ -274,12 +285,8 @@ module.exports = class GameServer {
      * @returns 
      */
     isDetectCollisionCircle(character, target) {
-        // 自分の弾に当たった場合は処理しない
-        if (character.type === 0) {
-            return true;
-        }
         const distance = character.position.distance(target.position);
-        return distance > character.size + target.size;
+        return distance <= character.size + target.size;
     }
 
     /**
@@ -289,61 +296,31 @@ module.exports = class GameServer {
      * @returns 
      */
     onBulletCollision(enemy, bullet) {
+        // 自分の弾に当たった場合は処理しない
+        if (enemy.type === 0) {
+            return true;
+        }
         if (this.isDetectCollisionCircle(enemy, bullet)) {
-            return;
+            // ダメージ計算
+            let damage = bullet.damage - enemy.vit;
+            const damagePosition = enemy.position.copy().addScalar(enemy.size);
+            if (bullet.parent.character.isCliticalHit()) {
+                damage *= 2;
+                this.onAddDamageText(damagePosition, `${damage}`, 'FFFF00');
+            } else {
+                this.onAddDamageText(damagePosition, `${damage}`, 'FFFFFF');
+            }
+    
+            enemy.reduceHP(damage);
+            if (enemy.hp <= 0) {
+                enemy.setAlive(false);
+                this.onBroadcastPacket(new UpdateLeaderboard(this.players));
+                // 経験値の追加
+                this.onAddExpRamune(damagePosition, 24);
+            }
+            bullet.parent.character.onAddScore(damage)
+            bullet.setAlive(false);
         }
-        // ダメージ計算
-        let damage = bullet.damage - enemy.vit;
-        const clitical = Math.random() < bullet.parent.character.luk;
-        const damagePosition = enemy.position.copy().addScalar(enemy.size);
-        if (clitical) {
-            damage = bullet.damage * 2;
-            this.onAddDamageText(damagePosition, `${damage}`, 'FFFF00');
-        } else {
-            this.onAddDamageText(damagePosition, `${damage}`, 'FFFFFF');
-        }
-        enemy.hp -= damage;
-        if (enemy.hp <= 0) {
-            enemy.isAlive = false;
-            this.onBroadcastPacket(new UpdateLeaderboard(this.players));
-            this.onAddExpRamune(new ExpRamune(
-                this.getGenerateId(),
-                damagePosition.x,
-                damagePosition.y,
-                24,
-                this.gameLevel * 10));
-        }
-        bullet.parent.character.score += damage;
-        bullet.isAlive = false;
-    }
-
-    /**
-     * 経験値の追加
-     * @param {*} ramune 
-     */
-    onAddExpRamune(ramune) {
-        this.expRamunes.push(ramune);
-        this.onAppendQuadtreePosition(ramune);
-
-    }
-
-    /**
-     * 経験値の削除
-     * @param {*} ramune 
-     */
-    onRemoveExpRamune(ramune) {
-        this.expRamunes = this.expRamunes.splice(this.expRamunes.indexOf(ramune), 1);
-        this.onRemoveQuadtreePosition(ramune);
-    }
-
-    /**
-     * ダメージテキストの追加
-     * @param {*} showPosition 
-     * @param {*} text 
-     * @param {*} color 
-     */
-    onAddDamageText(showPosition, text, color) {
-        this.onBroadcastPacket(new AddDamageText(new DamageText(showPosition.x, showPosition.y, text, color)));
     }
 
     /**
@@ -392,6 +369,9 @@ module.exports = class GameServer {
      * @param {*} nodeData 
      */
     onUpdateQuadtreePosition(nodeData) {
+        if (Utils.isEmpty(nodeData.quadTreeNode)) {
+            return;
+        }
         // 位置が変わっていない場合は処理しない
         if (nodeData.quadTreeNode.x === nodeData.position.x - nodeData.size &&
             nodeData.quadTreeNode.y === nodeData.position.y - nodeData.size &&
@@ -436,17 +416,6 @@ module.exports = class GameServer {
     }
 
     /**
-     * パケットのブロードキャスト
-     * @param {*} packet 
-     */
-    onBroadcastPacket(packet) {
-        // パケットの送信
-        this.players.forEach(client => {
-            client.onSendPacket(packet);
-        });
-    }
-
-    /**
      * チャットのブロードキャスト
      * @param {*} sender 
      * @param {*} message 
@@ -463,6 +432,9 @@ module.exports = class GameServer {
      * @param {*} player 
      */
     onAddPlayer(player) {
+        if (Utils.isEmpty(player)) {
+            return;
+        }
         this.players.push(player);
     }
 
@@ -471,6 +443,9 @@ module.exports = class GameServer {
      * @param {*} player 
      */
     onRemovePlayer(player) {
+        if (Utils.isEmpty(player)) {
+            return;
+        }
         this.players.splice(this.players.indexOf(player), 1);
     }
 
@@ -479,6 +454,9 @@ module.exports = class GameServer {
      * @param {*} character 
      */
     onAddCharacter(character) {
+        if (Utils.isEmpty(character)) {
+            return;
+        }
         this.characters.push(character);
         this.onAppendQuadtreePosition(character);
     }
@@ -488,6 +466,9 @@ module.exports = class GameServer {
      * @param {*} character 
      */
     onRemoveCharacter(character) {
+        if (Utils.isEmpty(character)) {
+            return;
+        }
         this.characters.splice(this.characters.indexOf(character), 1);
         this.onRemoveQuadtreePosition(character);
     }
@@ -497,6 +478,9 @@ module.exports = class GameServer {
      * @param {*} bullet 
      */
     onAddBullet(bullet) {
+        if (Utils.isEmpty(bullet)) {
+            return;
+        }
         this.bullets.push(bullet);
         this.onAppendQuadtreePosition(bullet);
     }
@@ -506,38 +490,112 @@ module.exports = class GameServer {
      * @param {*} bullet 
      */
     onRemoveBullet(bullet) {
+        if (Utils.isEmpty(bullet)) {
+            return;
+        }
         this.bullets.splice(this.bullets.indexOf(bullet), 1);
         this.onRemoveQuadtreePosition(bullet);
     }
 
     /**
-     * 接続時の処理
-     * @param {*} webSocket 
+     * 経験値の追加
+     * @param {*} ramune 
      */
-    onConnection(webSocket) {
-        if (this.players.length >= this.config.MaxPlayers ||
-            // this.players.find(client => client.webSocket._socket.remoteAddress === webSocket._socket.remoteAddress) ||
-            this.checkIPBanned(webSocket._socket.remoteAddress)) {
-            webSocket.close();
+    onAddExpRamune(position, size) {
+        if (Utils.isEmpty(position) || Utils.isEmpty(size)) {
             return;
         }
-        // プレイヤーの生成
-        const player = new Player(this, webSocket, this.getGenerateId());
-        player.onSendPacket(new UpdateServerInfo(this.config.ServerName, this.config.ServerDescription, 'ALPHA'));
-        player.onSendPacket(new AddBorder(this.border));
+        const ramune = new ExpRamune(
+            this.getGenerateId(),
+            position.x + (Math.random() - 0.5) * size,
+            position.y + (Math.random() - 0.5) * size,
+            size,
+            this.gameLevel * 10);
+        this.expRamunes.push(ramune);
+        this.onAppendQuadtreePosition(ramune);
+    }
 
-        // プレイヤーの追加
-        this.onAddPlayer(player);
-        this.onAddCharacter(player.character);
+    /**
+     * 経験値の削除
+     * @param {*} ramune 
+     */
+    onRemoveExpRamune(ramune) {
+        if (Utils.isEmpty(ramune)) {
+            return;
+        }
+        this.expRamunes = this.expRamunes.splice(this.expRamunes.indexOf(ramune), 1);
+        this.onRemoveQuadtreePosition(ramune);
+    }
 
-        player.onSendPacket(new UpdatePlayers(this.players));
-        player.onSendPacket(new UpdateLeaderboard(this.players));
-        player.onSendPacket(new TrackingId(player.character.id));   
-        player.onSendPacket(new AddChat(null, `${this.config.ServerName}`));
-        player.onSendPacket(new AddChat(null, `${this.config.ServerDescription}`));
-        player.onSendPacket(new AddChat(null, `${this.config.ServerStartMessage}`));
+    /**
+     * ダメージテキストの追加
+     * @param {*} showPosition 
+     * @param {*} text 
+     * @param {*} color 
+     */
+    onAddDamageText(showPosition, text, color) {
+        if (Utils.isEmpty(showPosition) || Utils.isEmpty(text) || Utils.isEmpty(color)) {
+            return;
+        }
+        this.onBroadcastPacket(new AddDamageText(new DamageText(showPosition.x, showPosition.y, text, color)));
+    }
 
-        this.logger.log(`Player id: ${player.character.id} address: ${webSocket._socket.remoteAddress} port: ${webSocket._socket.remotePort}`);
+    /**
+     * パケットのブロードキャスト
+     * @param {*} packet 
+     */
+    onBroadcastPacket(packet) {
+        if (Utils.isEmpty(packet)) {
+            return;
+        }
+        // パケットの送信
+        this.players.forEach(client => {
+            client.onSendPacket(packet);
+        });
+    }
+
+    /**
+     * ステージの更新
+     */
+    onUpdateGameStage() {
+        const enemyCount = this.characters.filter(character => character.type === 1).length;
+        if (enemyCount === 0) {
+            this.gameStage++;
+            let enemyCount = (10 * this.gameStage) > this.config.MaxSpawnEnemies ? this.config.MaxSpawnEnemies : (10 * this.gameStage);
+            for (let i = 0; i < enemyCount; i++) {
+                this.onAddEnemyCharacter();
+            }
+        }
+    }
+
+    /**
+     * 経過時間の取得
+     * @returns
+     */
+    getElapsedTimeSecond() {
+        return ~~(this.stopWatch.getElapsedTime() / 1000);
+    }
+
+    /**
+     * ゲームが終了したかどうかを判定する
+     * @returns 
+     */
+    checkGameEnd() {
+        return this.stopWatch.getElapsedTime() > this.config.ServerEndTime;
+    }
+
+    /**
+     * 最大スコアのプレイヤーを取得する
+     * @returns 
+     */
+    getMaxScorePlayer() {
+        let maxPlayer = null;
+        this.players.forEach((player) => {
+            if (Utils.isEmpty(maxPlayer) || maxPlayer.character.getScore() < player.character.getScore()) {
+                maxPlayer = player;
+            }
+        });
+        return maxPlayer;
     }
 
     /**
@@ -551,6 +609,10 @@ module.exports = class GameServer {
         return this.generateId++;
     }
 
+    /**
+     * 弾のIDの生成
+     * @returns 
+     */
     getGenerateBulletId() {
         if (this.generateBulletId >= 999999999) {
             this.generateBulletId = 0;

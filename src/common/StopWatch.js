@@ -33,6 +33,10 @@ module.exports = class StopWatch {
         }
     }
 
+    getDeltaTime() {
+        return this.getElapsedTime() / 1000;
+    }
+
     /**
      * タイマーをリセットする
      */

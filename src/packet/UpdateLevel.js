@@ -11,9 +11,13 @@ module.exports = class UpdateLevel {
         this.writer = new BinaryWriter();
     }
     
+    /**
+     * パケットを生成する
+     * @returns 
+     */
     getPacket() {
         this.writer.setUint8(0x0B);
-        this.writer.setUint8(this.level);
+        this.writer.setUint16(this.level);
         this.writer.setUint32(this.experience);
         return this.writer.toBuffer();
     }

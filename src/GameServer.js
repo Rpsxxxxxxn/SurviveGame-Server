@@ -131,8 +131,16 @@ module.exports = class GameServer {
     onUpdatePlayer() {
         // プレイヤーの更新
         this.players.forEach(player => {
-            player.onShootBullet();
-            player.onUpdate();
+            if (player.character.getAlive()) {
+                player.onShootBullet();
+                player.onUpdate();
+
+                // 敵との当たり判定
+                this.onQueryQuadtree(player.character).filter((node) => node.object.type === this.config.EnemyType).forEach((target) => {
+                    // 数が少ないので、ここで判定する
+                    this.onEnemyCollision(target.object, player.character);
+                });
+            }
         });
     }
 
@@ -144,10 +152,10 @@ module.exports = class GameServer {
         const targetPlayer = this.getMaxScorePlayer();
         // キャラクターの更新
         this.characters.forEach((character) => {
-            if (character.isAlive) {
+            if (character.getAlive()) {
                 character.onUpdatePhysics();
                 // 目標にするキャラクターを設定する
-                if (Utils.isNotEmpty(targetPlayer) && character.type === 1) {
+                if (Utils.isNotEmpty(targetPlayer) && character.type === this.config.EnemyType) {
                     character.targetTrackingMove(targetPlayer.character);
                 }
                 this.onQueryQuadtree(character).forEach((target) => {
@@ -167,14 +175,12 @@ module.exports = class GameServer {
     onUpdateBullet() {
         // 弾の更新
         this.bullets.forEach((bullet) => {
-            if (bullet.isAlive) {
+            if (bullet.getAlive()) {
                 bullet.onUpdatePhysics(this.border);
                 this.onUpdateQuadtreePosition(bullet);
                 // 弾の当たり判定
-                this.onQueryQuadtreeRectangle(bullet.onCollisionViewBox()).forEach((target) => {
-                    if (target.object.type === 1) {
-                        this.onBulletCollision(target.object, bullet);
-                    }
+                this.onQueryQuadtreeRectangle(bullet.onCollisionViewBox()).filter((target) => target.object.type === this.config.EnemyType).forEach((target) => {
+                    this.onBulletCollision(target.object, bullet);
                 });
             } else {
                 this.onRemoveBullet(bullet);
@@ -188,7 +194,7 @@ module.exports = class GameServer {
     onUpdateExp() {
         // 経験値の更新
         this.expRamunes.forEach((expRamune) => {
-            if (expRamune.isAlive) {
+            if (expRamune.getAlive()) {
                 expRamune.onUpdatePhysics(this.border);
                 this.onUpdateQuadtreePosition(expRamune);
                 this.players.forEach((player) => {
@@ -198,6 +204,8 @@ module.exports = class GameServer {
                     }
                     this.onExpRamuneCollision(player.character, expRamune);
                 })
+            } else {
+                this.onRemoveExpRamune(expRamune);
             }
         });
     }
@@ -206,9 +214,11 @@ module.exports = class GameServer {
      * 経験値の追加
      * @param {*} exp 
      */
-    onAddExp(exp) {
-        if (exp <= 0) return;
-        this.gameExp += exp;
+    onAddExp(experience) {
+        if (experience <= 0) {
+            return;
+        }
+        this.gameExp += experience;
         if (this.gameExp >= this.gameLevel * this.config.GameNextLevelExp) {
             this.gameLevel++;
             this.gameExp = 0;
@@ -264,6 +274,39 @@ module.exports = class GameServer {
     }
 
     /**
+     * 当たり判定の検知
+     * @param {*} character 
+     * @param {*} target 
+     * @returns 
+     */
+    isDetectCollisionCircle(character, target) {
+        const distance = character.position.distance(target.position);
+        return distance <= character.size + target.size;
+    }
+
+    /**
+     * 敵との衝突判定
+     * @param {*} enemy 
+     * @param {*} character 
+     */
+    onEnemyCollision(enemy, character) {
+        if (this.isDetectCollisionCircle(enemy, character)) {
+            // 敵との当たり判定
+            if (character.getAlive()) {
+                let damage = enemy.str - character.vit;
+                if (damage <= 0) {
+                    damage = 1;
+                }
+                // ダメージを与える
+                character.reduceHP(damage);
+                const damagePosition = character.position.copy().addScalar(character.size);
+                // ダメージテキストを追加する
+                this.onAddDamageText(damagePosition, `${enemy.str}`, this.config.EnemyHitColor);
+            }
+        }
+    }
+
+    /**
      * らむねとの衝突判定
      * @param {*} character 
      * @param {*} expRamune 
@@ -281,17 +324,6 @@ module.exports = class GameServer {
     }
 
     /**
-     * 当たり判定の検知
-     * @param {*} character 
-     * @param {*} target 
-     * @returns 
-     */
-    isDetectCollisionCircle(character, target) {
-        const distance = character.position.distance(target.position);
-        return distance <= character.size + target.size;
-    }
-
-    /**
      * キャラクターの衝突判定
      * @param {*} character 
      * @param {*} bullet 
@@ -303,24 +335,25 @@ module.exports = class GameServer {
             return true;
         }
         if (this.isDetectCollisionCircle(enemy, bullet)) {
+            let textColor = this.config.NormalHitColor;
             // ダメージ計算
             let damage = bullet.damage - enemy.vit;
             const damagePosition = enemy.position.copy().addScalar(enemy.size);
             if (bullet.parent.character.isCliticalHit()) {
                 damage *= 2;
-                this.onAddDamageText(damagePosition, `${damage}`, this.config.CliticalHitColor);
-            } else {
-                this.onAddDamageText(damagePosition, `${damage}`, this.config.NormalHitColor);
+                textColor = this.config.CliticalHitColor;
             }
+            if (damage <= 0) {
+                damage = 1;
+            }
+            this.onAddDamageText(damagePosition, `${damage}`, textColor);
     
             enemy.reduceHP(damage);
-            if (enemy.hp <= this.config.EnemyHPDead) {
-                enemy.setAlive(false);
+            if (!enemy.getAlive()) {
+                bullet.parent.character.onAddScore(this.gameStage * 10);
                 this.onBroadcastPacket(new UpdateLeaderboard(this.players));
-                // 経験値の追加
                 this.onAddExpRamune(damagePosition, this.config.RamuneSize);
             }
-            bullet.parent.character.onAddScore(damage)
             bullet.setAlive(false);
         }
     }
@@ -354,15 +387,12 @@ module.exports = class GameServer {
      */
     onAppendQuadtreePosition(nodeData) {
         // 既に追加済みの場合は処理しない
-        if (Utils.isNotEmpty(nodeData.quadTreeNode)) {
+        if (Utils.isNotEmpty(nodeData.getQuadTreeNode())) {
             return;
         }
         // プレイヤーの位置を追加
-        const objectNode = new ObjectNode(
-            nodeData.position.x - nodeData.size,
-            nodeData.position.y - nodeData.size,
-            nodeData.size * 2, nodeData.size * 2, nodeData);
-        nodeData.quadTreeNode = objectNode;
+        const objectNode = nodeData.getNewQuadTreeNode();
+        nodeData.setQuadTreeNode(objectNode);
         this.quadtree.insert(objectNode);
     }
 
@@ -371,14 +401,11 @@ module.exports = class GameServer {
      * @param {*} nodeData 
      */
     onUpdateQuadtreePosition(nodeData) {
-        if (Utils.isEmpty(nodeData.quadTreeNode)) {
+        if (Utils.isEmpty(nodeData.getQuadTreeNode())) {
             return;
         }
         // 位置が変わっていない場合は処理しない
-        if (nodeData.quadTreeNode.x === nodeData.position.x - nodeData.size &&
-            nodeData.quadTreeNode.y === nodeData.position.y - nodeData.size &&
-            nodeData.quadTreeNode.w === nodeData.size * 2 &&
-            nodeData.quadTreeNode.h === nodeData.size * 2) {
+        if (nodeData.checkUpdateQuadTreeNode()) {
             return;
         }
 
@@ -392,11 +419,11 @@ module.exports = class GameServer {
      */
     onRemoveQuadtreePosition(nodeData) {
         // 位置が設定されていない場合は処理しない
-        if (Utils.isEmpty(nodeData.quadTreeNode)) {
+        if (Utils.isEmpty(nodeData.getQuadTreeNode())) {
             return;
         }
-        this.quadtree.remove(nodeData.quadTreeNode);
-        nodeData.quadTreeNode = null;
+        this.quadtree.remove(nodeData.getQuadTreeNode());
+        nodeData.setQuadTreeNode(null);
     }
 
     /**
@@ -405,7 +432,7 @@ module.exports = class GameServer {
      * @returns 
      */
     onQueryQuadtree(value) {
-        return this.quadtree.query(value.quadTreeNode);
+        return this.quadtree.query(value.getQuadTreeNode());
     }
 
     /**
@@ -563,8 +590,9 @@ module.exports = class GameServer {
         const enemyCount = this.characters.filter(character => character.type === 1).length;
         if (enemyCount === 0) {
             this.gameStage++;
-            let enemyCount = (this.config.EnemyStartCount * this.gameStage) > this.config.MaxSpawnEnemies ? this.config.MaxSpawnEnemies : (10 * this.gameStage);
-            for (let i = 0; i < enemyCount; i++) {
+            const enemyStartCount = this.config.EnemyStartCount * this.gameStage;
+            const enemySpawnCount = enemyStartCount > this.config.MaxSpawnEnemies ? this.config.MaxSpawnEnemies : enemyStartCount;
+            for (let i = 0; i < enemySpawnCount; i++) {
                 this.onAddEnemyCharacter();
             }
         }
@@ -574,11 +602,7 @@ module.exports = class GameServer {
      * プレイヤーの追加
      */
     onBroadcastUpdateServerUsage() {
-        this.onBroadcastPacket(new UpdateServerUsage(
-            this.getCpuUsage(),
-            this.getMemoryUsage(),
-            this.deltaTime,
-            this.frameRate));
+        this.onBroadcastPacket(new UpdateServerUsage(this.getCpuUsage(), this.getMemoryUsage(), this.deltaTime, this.frameRate));
     }
 
     /**
@@ -616,7 +640,7 @@ module.exports = class GameServer {
      * @returns 
      */
     getGenerateId() {
-        if (this.generateId >= 999999999) {
+        if (this.generateId >= this.config.MaxGenerateId) {
             this.generateId = 0;
         }
         return this.generateId++;
@@ -627,7 +651,7 @@ module.exports = class GameServer {
      * @returns 
      */
     getGenerateBulletId() {
-        if (this.generateBulletId >= 999999999) {
+        if (this.generateBulletId >= this.config.MaxGenerateId) {
             this.generateBulletId = 0;
         }
         return this.generateBulletId++;
@@ -694,7 +718,7 @@ module.exports = class GameServer {
      */
     checkDeltaTime() {
         if (this.deltaTime > 1000) {
-            throw new Error('DeltaTime is too large.');
+            throw Error('DeltaTime is too large.');
         }
     }
 
@@ -703,7 +727,7 @@ module.exports = class GameServer {
      */
     checkFrameRate() {
         if (this.frameRate < 5) {
-            // throw new Error('FrameRate is too low.');
+            throw Error('FrameRate is too low.');
         }
     }
 

@@ -11,8 +11,8 @@
     "BorderSize": {
         "x": 0,
         "y": 0,
-        "w": 3000,
-        "h": 3000
+        "w": 2000,
+        "h": 2000
     },
 
     "DebugMode": true,
@@ -21,13 +21,14 @@
     "MaxConnectionsPerIP": 2,
     "MaxPlayers": 100,
     "MaxPlayerNameLength": 20,
+    "MaxGenerateId": 1000000,
 
     "PlayerType": 0,
     "PlayerChatEnabled": true,
     "PlayerChatLength": 100,
     "PlayerChatCooldownEnabled": true,
     "PlayerChatCooldown": 1000,
-    "PlayerExpRamuneDistance": 300,
+    "PlayerExpRamuneDistance": 2000,
     "PlayerSize": 24,
 
     "EnemyType": 1,
@@ -50,7 +51,8 @@
 
     "CliticalHitColor": "FFFF00",
     "NormalHitColor": "FFFFFF",
+    "EnemyHitColor": "FF0000",
 
-    "MaxSpawnEnemies": 200,
+    "MaxSpawnEnemies": 500,
     "MaxSpawnBullets": 500
 }

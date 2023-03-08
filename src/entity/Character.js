@@ -33,7 +33,10 @@ module.exports = class Character extends NodeData {
 
     reduceHP(damage) {
         this.hp -= damage;
-        if (this.hp < 0) this.hp = 0;
+        if (this.hp < 0) {
+            this.hp = 0;
+            this.isAlive = false;
+        }
     }
 
     isCliticalHit() {

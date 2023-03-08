@@ -34,7 +34,6 @@ module.exports = class GameServer {
         this.config = JSON.parse(this.readConfigText());
         this.command = new Command(this);
         this.stopWatch = new StopWatch();
-        this.movePacketWatch = new StopWatch();
 
         this.generateId = 0;
         this.generateCharacterId = 0;
@@ -132,14 +131,21 @@ module.exports = class GameServer {
         // プレイヤーの更新
         this.players.forEach(player => {
             if (player.character.getAlive()) {
-                player.onShootBullet();
+                player.onAction();
                 player.onUpdate();
 
                 // 敵との当たり判定
                 this.onQueryQuadtree(player.character).filter((node) => node.object.type === this.config.EnemyType).forEach((target) => {
                     // 数が少ないので、ここで判定する
-                    this.onEnemyCollision(target.object, player.character);
+                    if (!target.object.checkActionCoolTime()) {
+                        this.onEnemyCollision(target.object, player.character);
+                        target.object.resetActionCoolTime();
+                    }
                 });
+
+                if (player.character.level !== this.gameLevel) {
+                    player.character.levelUpStatus(this.gameLevel);
+                }
             }
         });
     }

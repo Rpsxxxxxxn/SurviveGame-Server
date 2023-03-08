@@ -1,4 +1,5 @@
 const Rectangle = require("../common/Rectangle");
+const StopWatch = require("../common/StopWatch");
 const Vector2 = require("../common/Vector2");
 const NodeData = require("./NodeData");
 
@@ -9,28 +10,54 @@ module.exports = class Character extends NodeData {
         this.name = ""; // 名前
         this.score = 0; // スコア
         this.direction = 0; // Math.PI * 4 * Direction
+        this.actionStopWatch = new StopWatch(); // アクションのクールダウン
+        this.actionStopWatch.start();
 
+        this.level = 1;
         this.hp = 100; // 体力
         this.str = 10; // 物理攻撃力
         this.vit = 5; // 防御力
         this.dex = 1; // 攻撃速度
         this.int = 1; // 魔法攻撃力
         this.luk = 0.1; // クリティカル率
-        this.spd = 1; // 移動速度
+        this.spd = 3; // 移動速度
 
         this.viewerBox = new Rectangle(0, 0, 100, 100); // 視界範囲
     }
 
-    setStatus(hp, str, vit, dex, int, luk, spd) {
-        this.hp = hp;
-        this.str = str;
-        this.vit = vit;
-        this.dex = dex;
-        this.int = int;
-        this.luk = luk;
-        this.spd = spd;
+    levelUpStatus(gameLevel) {
+        this.level = gameLevel;
+        this.hp = gameLevel * 100;
+        this.str = gameLevel * 10;
+        this.vit = gameLevel * 5;
+
+        this.dex = gameLevel * .1 > 100 ? 100 : gameLevel * .1;
+        this.int = gameLevel * 1;
+
+        const luk = ~~(gameLevel / 10) === 0 ? 1 : ~~(gameLevel / 10);
+        this.luk = luk * 0.1 > 0.5 ? 0.5 : luk * 0.1;
     }
 
+    /**
+     * クールタイムのチェック
+     * @returns 
+     */
+    checkActionCoolTime() {
+        return this.actionStopWatch.getElapsedTime() < 1000 / this.dex;
+    }
+
+    /**
+     * クールタイムのリセット
+     */
+    resetActionCoolTime() {
+        this.actionStopWatch.reset();
+        this.actionStopWatch.start();
+    }
+
+    /**
+     * 体力の減少
+     * @param {*} damage 
+     */
     reduceHP(damage) {
         this.hp -= damage;
         if (this.hp < 0) {
@@ -39,10 +66,18 @@ module.exports = class Character extends NodeData {
         }
     }
 
+    /**
+     * クリティカルヒットかどうかを判定する
+     * @returns 
+     */
     isCliticalHit() {
         return Math.random() < this.luk;
     }
 
+    /**
+     * スコアの加算
+     * @param {*} score 
+     */
     onAddScore(score) {
         this.score += score;
     }

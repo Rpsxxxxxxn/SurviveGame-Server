@@ -22,8 +22,8 @@ module.exports = class Player {
         this.character = new Character(this, 0, id, new Vector2(this.gameServer.border.w * .5, this.gameServer.border.h * .5), 24);
         this.chatStopWatch = new StopWatch();
         this.chatStopWatch.start();
-        this.bulletCooldown = new StopWatch();
-        this.bulletCooldown.start();
+        this.movePacketWatch = new StopWatch();
+        this.movePacketWatch.start();
         this.closestEnemy = null;
         this.spectatePlayer = null;
         if (this.webSocket) {
@@ -149,10 +149,16 @@ module.exports = class Player {
      * @param {*} reader 
      */
     onMove(reader) {
-        if (!this.character.isAlive) return;
+        if (!this.character.isAlive ||
+            this.movePacketWatch.getElapsedTime() < 10) {
+            return;
+        }
         const direction = reader.getUint8();
         this.character.direction = direction * (Math.PI / 4);
-        this.character.position.add(Vector2.fromAngle(this.character.direction).mulScalar(2));
+        this.character.position.add(Vector2.fromAngle(this.character.direction).mulScalar(this.character.spd));
+        
+        this.movePacketWatch.reset();
+        this.movePacketWatch.start();
     }
 
     /**
@@ -160,7 +166,9 @@ module.exports = class Player {
      * @param {*} reader 
      */
     onShopSelect(reader) {
-        if (!this.character.isAlive) return;
+        if (!this.character.isAlive) {
+            return;
+        }
         const shopId = reader.getUint8();
         const shop = this.gameServer.shops.find(shop => shop.id === shopId);
         if (shop) {
@@ -189,11 +197,13 @@ module.exports = class Player {
     }
 
     /**
-     * 弾の発射
+     * プレイヤーの行動を実行する
      * @returns 
      */
-    onShootBullet() {
-        if (this.getBulletCooldown()) return;
+    onAction() {
+        if (this.character.checkActionCoolTime()) {
+            return; // クールタイム中
+        }
         if (this.closestEnemy) {
             const direction = this.character.position.direction(this.closestEnemy.position);
             this.gameServer.onShootBullet(this, direction);
@@ -205,15 +215,6 @@ module.exports = class Player {
         } else {
             this.gameServer.onShootBullet(this);
         }
-        this.bulletCooldown.reset();
-        this.bulletCooldown.start();
-    }
-
-    /**
-     * 弾のクールタイムをチェックする
-     * @returns 
-     */
-    getBulletCooldown() {
-        return this.bulletCooldown.getElapsedTime() < (1000 / this.character.dex);
+        this.character.resetActionCoolTime();
     }
 }

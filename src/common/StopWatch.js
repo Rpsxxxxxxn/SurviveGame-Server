@@ -33,6 +33,10 @@ module.exports = class StopWatch {
         }
     }
 
+    /**
+     * 経過時間を秒単位で取得する
+     * @returns 
+     */
     getDeltaTime() {
         return this.getElapsedTime() / 1000;
     }

@@ -16,16 +16,18 @@ module.exports = class Player {
      * @param {*} webSocket 
      * @param {*} id 
      */
-    constructor(gameServer, webSocket, id) {
+    constructor(gameServer, webSocket, id, x, y, size) {
         this.gameServer = gameServer;
         this.webSocket = webSocket;
-        this.character = new Character(this, 0, id, new Vector2(this.gameServer.border.w * .5, this.gameServer.border.h * .5), 24);
+        this.character = new Character(this, 0, id, new Vector2(x, y), size);
         this.chatStopWatch = new StopWatch();
         this.chatStopWatch.start();
         this.movePacketWatch = new StopWatch();
         this.movePacketWatch.start();
         this.closestEnemy = null;
         this.spectatePlayer = null;
+
+        this.weapons = [];
         if (this.webSocket) {
             this.webSocket.on('message', this.onMessageHandler.bind(this));
             this.webSocket.on('close', this.onDisconnect.bind(this));
@@ -192,8 +194,6 @@ module.exports = class Player {
      */
     onDisconnect() {
         this.character.isAlive = false;
-        this.gameServer.onRemovePlayer(this);
-        this.gameServer.onRemoveCharacter(this.character);
     }
 
     /**
@@ -207,14 +207,23 @@ module.exports = class Player {
         if (this.closestEnemy) {
             const direction = this.character.position.direction(this.closestEnemy.position);
             this.gameServer.onShootBullet(this, direction);
-
-            this.gameServer.onShootBullet(this, direction - Math.PI * .2);
-            this.gameServer.onShootBullet(this, direction - Math.PI * .1);
-            this.gameServer.onShootBullet(this, direction + Math.PI * .2);
-            this.gameServer.onShootBullet(this, direction + Math.PI * .1);
         } else {
             this.gameServer.onShootBullet(this);
         }
         this.character.resetActionCoolTime();
+    }
+
+    /**
+     * 武器の追加
+     * @param {*} value 
+     */
+    onAddWeapon(value) {
+        if (Utils.isEmpty(value)) {
+            return;
+        }
+        this.weapons.push(value);
+        if (this.weapons.length > this.gameServer.config.PlayerWeaponMax) {
+            this.weapons.shift();
+        }
     }
 }

@@ -20,9 +20,9 @@ module.exports = class UpdateServerInfo {
      */
     getPacket() {
         this.writer.setUint8(0x04);
-        this.writer.setString(this.serverName);
-        this.writer.setString(this.serverDescription);
-        this.writer.setString(this.serverVersion);
+        this.writer.setString(this.serverName); // サーバー名
+        this.writer.setString(this.serverDescription); // サーバーの説明
+        this.writer.setString(this.serverVersion); // サーバーのバージョン
         return this.writer.toBuffer();
     }
 }

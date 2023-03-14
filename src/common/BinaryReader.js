@@ -97,6 +97,10 @@ module.exports = class BinaryReader {
         return value;
     }
 
+    /**
+     * UTF8文字列を取得する
+     * @returns 
+     */
     getUTF8String() {
         let length = this.getUint16();
         let value = this.view.toString('utf8', this.offset, this.offset + length);

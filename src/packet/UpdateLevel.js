@@ -17,8 +17,8 @@ module.exports = class UpdateLevel {
      */
     getPacket() {
         this.writer.setUint8(0x0B);
-        this.writer.setUint16(this.level);
-        this.writer.setUint32(this.experience);
+        this.writer.setUint16(this.level); // レベル
+        this.writer.setUint32(this.experience); // 経験値
         return this.writer.toBuffer();
     }
 }

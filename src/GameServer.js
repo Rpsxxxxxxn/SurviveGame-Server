@@ -6,12 +6,10 @@ const QuadTree = require("./common/QuadTree");
 const Rectangle = require("./common/Rectangle");
 
 const AddChat = require("./packet/AddChat");
-const AddPlayer = require("./packet/AddPlayer");
 const UpdateServerInfo = require("./packet/UpdateServerInfo");
 const Player = require("./Player");
 const Command = require("./Command");
 const StopWatch = require("./common/StopWatch");
-const UpdatePlayers = require("./packet/UpdatePlayers");
 const TrackingId = require("./packet/TrackingId");
 const UpdateCharacters = require("./packet/UpdateCharacters");
 const UpdateServerUsage = require("./packet/UpdateServerUsage");
@@ -70,18 +68,14 @@ module.exports = class GameServer {
             webSocket.close();
             return;
         }
-        // プレイヤーの生成
-        const player = new Player(this, webSocket, this.getGenerateId());
-        player.onSendPacket(new UpdateServerInfo(this.config.ServerName, this.config.ServerDescription, 'ALPHA'));
-        player.onSendPacket(new AddBorder(this.border));
+        const player = new Player(this, webSocket, this.getGenerateId(), this.border.w * .5, this.border.h * .5, this.config.PlayerSize);
 
-        // プレイヤーの追加
         this.onAddPlayer(player);
         this.onAddCharacter(player.character);
 
-        player.onSendPacket(new UpdatePlayers(this.players));
+        player.onSendPacket(new AddBorder(this.border));
         player.onSendPacket(new UpdateLeaderboard(this.players));
-        player.onSendPacket(new TrackingId(player.character.id));   
+        player.onSendPacket(new TrackingId(player.character.id));
         player.onSendPacket(new AddChat(null, `${this.config.ServerName}`));
         player.onSendPacket(new AddChat(null, `${this.config.ServerDescription}`));
         player.onSendPacket(new AddChat(null, `${this.config.ServerStartMessage}`));
@@ -117,10 +111,6 @@ module.exports = class GameServer {
         this.checkDeltaTime();
         this.checkFrameRate();
 
-        // if (~~(this.stopWatch.getElapsedTime() % this.config.ServerLoopInterval) == 0) {
-        //     this.onBroadcastUpdateServerUsage();
-        // }
-
         setTimeout(this.onMainloop.bind(this), this.config.ServerLoopInterval);
     }
 
@@ -143,9 +133,12 @@ module.exports = class GameServer {
                     }
                 });
 
+                // レベルアップさせる
                 if (player.character.level !== this.gameLevel) {
                     player.character.levelUpStatus(this.gameLevel);
                 }
+            } else {
+                this.onRemovePlayer(player);
             }
         });
     }

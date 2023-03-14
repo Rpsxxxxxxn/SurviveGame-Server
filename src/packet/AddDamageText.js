@@ -10,6 +10,10 @@ module.exports = class AddDamageText {
         this.writer = new BinaryWriter();
     }
 
+    /**
+     * パケットを生成する
+     * @returns 
+     */
     getPacket() {
         this.writer.setUint8(0x09); // パケットID
         this.writer.setFloat32(this.damageText.position.x); // ダメージテキストの位置

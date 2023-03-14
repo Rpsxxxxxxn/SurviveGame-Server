@@ -1,11 +1,19 @@
 const BinaryWriter = require("../common/BinaryWriter");
 
 module.exports = class UpdateBullets {
+    /**
+     * 弾の更新
+     * @param {*} bullets 
+     */
     constructor(bullets) {
         this.bullets = bullets;
         this.writer = new BinaryWriter();
     }
 
+    /**
+     * パケットを生成する
+     * @returns 
+     */
     getPacket() {
         this.writer.setUint8(0x0A);
         this.writer.setUint16(this.bullets.length);

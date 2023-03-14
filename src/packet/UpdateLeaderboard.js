@@ -16,11 +16,11 @@ module.exports = class UpdateLeaderboard {
      */
     getPacket() {
         this.writer.setUint8(0x03);
-        this.writer.setUint8(this.players.length);
+        this.writer.setUint8(this.players.length); // プレイヤーの数
         this.players.forEach(player => {
-            this.writer.setUint32(player.character.id);
-            this.writer.setString(player.character.name);
-            this.writer.setUint32(player.character.score);
+            this.writer.setUint32(player.character.id); // プレイヤーのID
+            this.writer.setString(player.character.name); // プレイヤーの名前
+            this.writer.setUint32(player.character.score); // プレイヤーのスコア
         });
         return this.writer.toBuffer();
     }

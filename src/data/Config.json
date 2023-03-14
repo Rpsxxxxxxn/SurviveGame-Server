@@ -29,6 +29,8 @@
     "PlayerChatCooldownEnabled": true,
     "PlayerChatCooldown": 1000,
     "PlayerExpRamuneDistance": 2000,
+    "PlayerWeaponMax": 5,
+    "PlayerWeaponMaxLevel": 10,
     "PlayerSize": 24,
 
     "EnemyType": 1,
@@ -47,7 +49,7 @@
     "RamuneExp": 10,
     "RamuneRandomPositionRate": 0.5,
 
-    "GameNextLevelExp": 100,
+    "GameNextLevelExp": 1000,
 
     "CliticalHitColor": "FFFF00",
     "NormalHitColor": "FFFFFF",

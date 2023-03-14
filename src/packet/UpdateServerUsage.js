@@ -20,10 +20,10 @@ module.exports = class UpdateServerUsage {
      */
     getPacket() {
         this.writer.setUint8(0x05);
-        this.writer.setFloat32(this.cpuUsage);
-        this.writer.setFloat32(this.ramUsage);
-        this.writer.setFloat32(this.deltaTime);
-        this.writer.setFloat32(this.framerate);
+        this.writer.setFloat32(this.cpuUsage); // CPUの使用率
+        this.writer.setFloat32(this.ramUsage); // RAMの使用率
+        this.writer.setFloat32(this.deltaTime); // フレームの時間
+        this.writer.setFloat32(this.framerate); // フレームレート
         return this.writer.toBuffer();
     }
 }
